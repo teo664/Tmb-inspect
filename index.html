@@ -1106,19 +1106,8 @@ const CHECKLIST_DATA = [
 ];
 
 // ── jsPDF: carga dinámica con 3 CDNs de respaldo ─────────────
-async function ensureJsPDF() {
-  if (window.jspdf && window.jspdf.jsPDF) return;
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = '/jspdf.js';
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    throw new Error('No se pudo cargar la librería PDF.');
-  }
-}
+// PDF via impresión del navegador — sin dependencias externas
+async function ensureJsPDF() { /* no-op */ }
 async function loadLogoBase64() {
   try {
     const resp = await fetch('/logo.jpg');
@@ -1131,128 +1120,212 @@ async function loadLogoBase64() {
 }
 
 async function generatePDF(inspection) {
-  await ensureJsPDF();
-  const logoBase64 = await loadLogoBase64();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-  const ML = 15, MR = 15, MT = 15; let y = MT;
-  const RED=[200,16,46],NAVY=[31,45,61],NAVYM=[44,62,80],STEEL=[127,140,154],WHITE=[255,255,255],GREEN=[26,158,92],LIGHT=[244,246,248];
-  const sf=(style,size,color)=>{doc.setFont('helvetica',style);doc.setFontSize(size);if(color)doc.setTextColor(...color);};
-  const npi=(n=20)=>{if(y+n>H-14){addFtr();doc.addPage();y=MT;addPH();}};
-  const addFtr=()=>{
-    const pg=doc.internal.getCurrentPageInfo().pageNumber;
-    doc.setFillColor(...NAVY);doc.rect(0,H-11,W,11,'F');
-    sf('normal',7.5,WHITE);
-    doc.text('Technical Maritime Bureau SL  ·  Las Palmas de Gran Canaria  ·  info@technicalmb.net  ·  +34 928 271 172',ML,H-4);
-    doc.text(`Pág. ${pg}`,W-MR,H-4,{align:'right'});
-  };
-  const addPH=()=>{
-    doc.setFillColor(...NAVY);doc.rect(0,0,W,12,'F');
-    doc.setFillColor(...RED);doc.rect(0,12,W,2,'F');
-    if(logoBase64){try{doc.addImage(logoBase64,'JPEG',ML,1,9,9);}catch(e){}}
-    sf('bold',9,WHITE);doc.text('TMB INSPECT  |  SHIP INSPECTION REPORT',ML+(logoBase64?12:0),8);
-    sf('normal',8,STEEL);doc.text(`M/V ${inspection.vessel.name||'—'}`,W-MR,8,{align:'right'});
-    y=22;
-  };
-  // Portada
-  doc.setFillColor(...RED);doc.rect(0,0,W,22,'F');
-  if(logoBase64){try{doc.addImage(logoBase64,'JPEG',ML,2,16,16);}catch(e){}}
-  sf('bold',16,WHITE);doc.text('TECHNICAL MARITIME BUREAU SL',ML+20,10);
-  sf('normal',7,[255,200,200]);doc.text('Las Palmas de Gran Canaria  ·  info@technicalmb.net',ML+20,16);
-  sf('bold',15,WHITE);doc.text('SHIP INSPECTION REPORT',W-MR,10,{align:'right'});
-  sf('normal',8,[255,200,200]);
-  const v=inspection.vessel;
-  const ds=v.date?new Date(v.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'—';
-  doc.text(ds,W-MR,17,{align:'right'});
-  doc.setFillColor(...NAVY);doc.rect(0,22,W,2,'F');y=30;
-  // Datos buque
-  doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
-  sf('bold',10,WHITE);doc.text('VESSEL INFORMATION',ML+4,y+5.5);y+=10;
-  const rows=[['Vessel Name',v.name||'—','Port of Inspection',v.port||'—'],['Flag',v.flag||'—','IMO / Official No.',v.imo||'—'],['Vessel Type',v.type||'—','Date of Inspection',ds],['Inspector',v.inspector||'—','Job Reference',v.jobRef||'—']];
-  const cW=(W-ML-MR)/4;
-  rows.forEach((r,i)=>{
-    doc.setFillColor(...(i%2===0?LIGHT:WHITE));doc.rect(ML,y,W-ML-MR,7,'F');
-    sf('bold',7.5,STEEL);doc.text(r[0],ML+2,y+2.5);sf('bold',9,NAVY);doc.text(r[1],ML+2,y+6);
-    sf('bold',7.5,STEEL);doc.text(r[2],ML+cW*2+2,y+2.5);sf('bold',9,NAVY);doc.text(r[3],ML+cW*2+2,y+6);y+=7;
-  });y+=6;
-  // Resumen
-  npi(30);doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
-  sf('bold',10,WHITE);doc.text('INSPECTION CHECKLIST RESULTS',ML+4,y+5.5);y+=10;
-  let tY=0,tN=0,tA=0,tT=0;
-  Object.values(inspection.checklist).forEach(v=>{tT++;if(v==='yes')tY++;else if(v==='no')tN++;else if(v==='na')tA++;});
-  const stats=[{l:'SATISFACTORY',v:tY,c:GREEN},{l:'DEFICIENCY',v:tN,c:RED},{l:'NOT APPLICABLE',v:tA,c:STEEL},{l:'TOTAL ITEMS',v:tT,c:NAVY}];
-  const sW=(W-ML-MR)/4;
-  stats.forEach((s,i)=>{const x=ML+i*sW;doc.setFillColor(...LIGHT);doc.rect(x,y,sW-1,14,'F');sf('bold',18,s.c);doc.text(String(s.v),x+sW/2-.5,y+9,{align:'center'});sf('bold',6.5,STEEL);doc.text(s.l,x+sW/2-.5,y+13,{align:'center'});});y+=18;
+  // Genera el informe en una ventana de impresión — convierte a PDF con Ctrl+P / Share
+  const v = inspection.vessel;
+  const dateStr = v.date ? new Date(v.date + 'T12:00:00').toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'}) : '—';
+  
+  let yes=0,no=0,na=0;
+  Object.values(inspection.checklist).forEach(val => { if(val==='yes')yes++; else if(val==='no')no++; else if(val==='na')na++; });
+
+  // Fotos en base64 ya están en inspection.photos
+  const photosHTML = inspection.photos.length ? `
+    <div class="section-header">📷 EVIDENCIA FOTOGRÁFICA (${inspection.photos.length} fotos)</div>
+    <div class="photo-grid">${inspection.photos.map(p=>`
+      <div class="photo-item">
+        <img src="${p.dataUrl}" alt="${p.caption||''}">
+        <div class="photo-caption">${p.caption||''}</div>
+      </div>`).join('')}
+    </div>` : '';
+
   // Checklist por categoría
-  CHECKLIST_DATA.forEach(cat=>{
-    const ci=cat.items.filter(item=>inspection.checklist[item.id]);if(!ci.length)return;
-    npi(12);doc.setFillColor(...NAVYM);doc.rect(ML,y,W-ML-MR,7,'F');sf('bold',9,WHITE);doc.text(cat.title,ML+3,y+5);y+=7;
-    ci.forEach((item,idx)=>{
-      npi(7);const val=inspection.checklist[item.id];
-      doc.setFillColor(...(idx%2===0?LIGHT:WHITE));doc.rect(ML,y,W-ML-MR-24,6.5,'F');
-      let sc=STEEL,st='N/A';if(val==='yes'){sc=GREEN;st='SAT ✓';}if(val==='no'){sc=RED;st='DEF ✗';}
-      doc.setFillColor(...sc);doc.rect(W-MR-22,y,22,6.5,'F');
-      sf('normal',8,NAVYM);doc.text(doc.splitTextToSize(item.en,W-ML-MR-32)[0],ML+2,y+4.5);
-      sf('bold',8,WHITE);doc.text(st,W-MR-11,y+4.5,{align:'center'});y+=6.5;
-    });y+=3;
-  });
+  const checklistHTML = CHECKLIST_DATA.map(cat => {
+    const items = cat.items.filter(item => inspection.checklist[item.id]);
+    if (!items.length) return '';
+    return `<div class="cat-block">
+      <div class="cat-header">${cat.icon} ${cat.title}</div>
+      ${items.map((item,i) => {
+        const val = inspection.checklist[item.id];
+        const cls = val==='yes'?'sat':val==='no'?'def':'na';
+        const lbl = val==='yes'?'SAT ✓':val==='no'?'DEF ✗':'N/A';
+        return `<div class="check-row ${i%2===0?'alt':''} ${cls}">
+          <span class="check-text">${item.en}</span>
+          <span class="check-badge ${cls}">${lbl}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
   // Deficiencias
-  const defs=[];CHECKLIST_DATA.forEach(cat=>cat.items.forEach(item=>{if(inspection.checklist[item.id]==='no')defs.push({cat:cat.title,text:item.en});}));
-  if(defs.length){
-    npi(20);y+=4;doc.setFillColor(...RED);doc.rect(ML,y,W-ML-MR,8,'F');
-    sf('bold',10,WHITE);doc.text(`⚠  DEFICIENCIES REQUIRING ATTENTION  (${defs.length})`,ML+4,y+5.5);y+=10;
-    defs.forEach((d,i)=>{
-      npi(8);doc.setFillColor(...(i%2===0?[255,235,238]:WHITE));doc.rect(ML,y,W-ML-MR,8,'F');
-      doc.setFillColor(...RED);doc.rect(ML,y,3,8,'F');
-      sf('bold',7.5,STEEL);doc.text((d.cat.split('/')[1]?.trim()||d.cat).toUpperCase(),ML+6,y+3);
-      sf('normal',8.5,NAVY);doc.text(doc.splitTextToSize(d.text,W-ML-MR-10)[0],ML+6,y+6.5);y+=8;
-    });y+=4;
-  }
-  // Fotos
-  if(inspection.photos&&inspection.photos.length){
-    npi(20);y+=2;doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
-    sf('bold',10,WHITE);doc.text(`PHOTOGRAPHIC EVIDENCE  (${inspection.photos.length} photos)`,ML+4,y+5.5);y+=12;
-    const pW=(W-ML-MR-6)/2,pH=46;let col=0;
-    for(const photo of inspection.photos){
-      if(col===0)npi(pH+10);const xP=ML+col*(pW+6);
-      try{doc.addImage(photo.dataUrl,'JPEG',xP,y,pW,pH,undefined,'MEDIUM');}catch(e){doc.setFillColor(...LIGHT);doc.rect(xP,y,pW,pH,'F');}
-      sf('normal',7.5,NAVYM);doc.text(doc.splitTextToSize(photo.caption||`Photo ${inspection.photos.indexOf(photo)+1}`,pW)[0],xP,y+pH+4);
-      col++;if(col===2){col=0;y+=pH+10;}
-    }
-    if(col!==0)y+=pH+10;y+=4;
-  }
+  const defs = [];
+  CHECKLIST_DATA.forEach(cat => cat.items.forEach(item => {
+    if (inspection.checklist[item.id] === 'no') defs.push({cat: cat.title.split('/')[1]?.trim()||cat.title, text: item.en});
+  }));
+  const defsHTML = defs.length ? `
+    <div class="section-header deficiency">⚠ DEFICIENCIAS DETECTADAS (${defs.length})</div>
+    ${defs.map((d,i)=>`<div class="def-row ${i%2===0?'alt':''}">
+      <span class="def-cat">${d.cat.toUpperCase()}</span>
+      <span class="def-text">${d.text}</span>
+    </div>`).join('')}` : '';
+
   // Materiales
-  if(inspection.materials&&inspection.materials.length){
-    npi(20);y+=2;doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
-    sf('bold',10,WHITE);doc.text(`MATERIALS & RESOURCES REQUIRED  (${inspection.materials.length} items)`,ML+4,y+5.5);y+=10;
-    doc.setFillColor(...NAVYM);doc.rect(ML,y,W-ML-MR,7,'F');
-    sf('bold',8,WHITE);doc.text('#',ML+3,y+5);doc.text('Description / Material',ML+12,y+5);doc.text('Qty',W-MR-33,y+5,{align:'right'});doc.text('Unit',W-MR-8,y+5,{align:'right'});y+=7;
-    inspection.materials.forEach((m,i)=>{
-      npi(7);doc.setFillColor(...(i%2===0?LIGHT:WHITE));doc.rect(ML,y,W-ML-MR,7,'F');
-      sf('normal',8,NAVYM);doc.text(String(i+1),ML+3,y+4.8);doc.text(doc.splitTextToSize(m.description||'—',W-ML-MR-55)[0],ML+12,y+4.8);
-      sf('bold',8,NAVY);doc.text(String(m.quantity||'—'),W-MR-33,y+4.8,{align:'right'});sf('normal',8,NAVYM);doc.text(m.unit||'—',W-MR-8,y+4.8,{align:'right'});y+=7;
-    });y+=4;
+  const matsHTML = inspection.materials.length ? `
+    <div class="section-header">📦 MATERIALES NECESARIOS (${inspection.materials.length} items)</div>
+    <table class="mat-table">
+      <thead><tr><th>#</th><th>Descripción</th><th>Cantidad</th><th>Unidad</th></tr></thead>
+      <tbody>${inspection.materials.map((m,i)=>`
+        <tr class="${i%2===0?'alt':''}"><td>${i+1}</td><td>${m.description||'—'}</td><td>${m.quantity||'—'}</td><td>${m.unit||'—'}</td></tr>`).join('')}
+      </tbody>
+    </table>` : '';
+
+  const notesHTML = inspection.notes ? `
+    <div class="section-header">📝 NOTAS DEL INSPECTOR</div>
+    <div class="notes-box">${inspection.notes.replace(/\n/g,'<br>')}</div>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TMB Inspect — ${v.name||'Report'}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #1F2D3D; background: white; }
+  .header { background: #C8102E; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .header-left h1 { font-size: 20pt; font-weight: 900; letter-spacing: 1px; }
+  .header-left p { font-size: 8pt; opacity: 0.8; margin-top: 2px; }
+  .header-right { text-align: right; }
+  .header-right h2 { font-size: 13pt; font-weight: 700; }
+  .header-right p { font-size: 8pt; opacity: 0.8; }
+  .navy-bar { background: #1F2D3D; height: 3px; }
+  .vessel-box { background: #1F2D3D; color: white; padding: 8px 20px; }
+  .vessel-box h3 { font-size: 9pt; letter-spacing: 1px; color: #7f8c9a; text-transform: uppercase; margin-bottom: 6px; }
+  .vessel-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .vessel-field label { display: block; font-size: 7pt; color: #7f8c9a; text-transform: uppercase; letter-spacing: 0.5px; }
+  .vessel-field span { font-size: 10pt; font-weight: 700; color: white; }
+  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: #d5dce4; margin: 12px 20px; border: 1px solid #d5dce4; }
+  .summary-item { background: #F4F6F8; padding: 10px; text-align: center; }
+  .summary-item .val { font-size: 24pt; font-weight: 900; }
+  .summary-item .lbl { font-size: 7pt; color: #7f8c9a; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-item.green .val { color: #1a9e5c; }
+  .summary-item.red .val { color: #C8102E; }
+  .summary-item.gray .val { color: #95a5a6; }
+  .section-header { background: #1F2D3D; color: white; padding: 6px 20px; font-size: 9pt; font-weight: 700; letter-spacing: 0.5px; margin-top: 10px; }
+  .section-header.deficiency { background: #C8102E; }
+  .cat-block { margin: 0 20px 8px; }
+  .cat-header { background: #2c3e50; color: white; padding: 5px 10px; font-size: 9pt; font-weight: 700; margin-top: 6px; }
+  .check-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; font-size: 9pt; }
+  .check-row.alt { background: #F4F6F8; }
+  .check-badge { font-size: 8pt; font-weight: 700; padding: 2px 8px; border-radius: 3px; color: white; flex-shrink: 0; }
+  .check-badge.sat { background: #1a9e5c; }
+  .check-badge.def { background: #C8102E; }
+  .check-badge.na { background: #95a5a6; }
+  .check-text { flex: 1; margin-right: 10px; }
+  .def-row { display: flex; gap: 10px; padding: 5px 20px; font-size: 9pt; border-left: 3px solid #C8102E; margin: 2px 20px; }
+  .def-row.alt { background: #fff0f2; }
+  .def-cat { font-weight: 700; color: #95a5a6; font-size: 7.5pt; flex-shrink: 0; min-width: 90px; }
+  .photo-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; padding: 10px 20px; }
+  .photo-item img { width: 100%; height: 160px; object-fit: cover; border: 1px solid #d5dce4; }
+  .photo-caption { font-size: 8pt; color: #7f8c9a; margin-top: 3px; }
+  .mat-table { width: calc(100% - 40px); margin: 8px 20px; border-collapse: collapse; font-size: 9pt; }
+  .mat-table th { background: #2c3e50; color: white; padding: 5px 8px; text-align: left; font-size: 8pt; }
+  .mat-table td { padding: 4px 8px; border-bottom: 1px solid #d5dce4; }
+  .mat-table tr.alt td { background: #F4F6F8; }
+  .notes-box { margin: 6px 20px; padding: 10px; background: #F4F6F8; border-left: 3px solid #C8102E; font-size: 9.5pt; line-height: 1.5; }
+  .signature { margin: 15px 20px 0; padding: 12px; background: #F4F6F8; border-left: 3px solid #1F2D3D; }
+  .signature h4 { font-size: 9pt; margin-bottom: 6px; }
+  .signature p { font-size: 8.5pt; color: #2c3e50; line-height: 1.5; }
+  .sig-line { display: flex; justify-content: space-between; margin-top: 12px; align-items: flex-end; }
+  .sig-field { text-align: center; }
+  .sig-field .line { border-bottom: 1px solid #1F2D3D; width: 140px; height: 30px; }
+  .sig-field label { font-size: 7.5pt; color: #7f8c9a; display: block; margin-top: 3px; }
+  .footer { background: #1F2D3D; color: #7f8c9a; padding: 6px 20px; font-size: 7.5pt; display: flex; justify-content: space-between; margin-top: 15px; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none; }
+    @page { margin: 0; size: A4; }
   }
-  // Notas
-  if(inspection.notes&&inspection.notes.trim()){
-    npi(20);y+=2;doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
-    sf('bold',10,WHITE);doc.text("INSPECTOR'S NOTES & OBSERVATIONS",ML+4,y+5.5);y+=10;
-    const nl=doc.splitTextToSize(inspection.notes,W-ML-MR-8),nH=Math.max(20,nl.length*5+8);
-    doc.setFillColor(...LIGHT);doc.rect(ML,y,W-ML-MR,nH,'F');doc.setFillColor(...RED);doc.rect(ML,y,3,nH,'F');
-    sf('normal',9,NAVYM);doc.text(nl,ML+7,y+6);y+=nH+6;
+</style>
+
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>TMB</h1>
+    <p>Technical Maritime Bureau SL  ·  Las Palmas de Gran Canaria</p>
+  </div>
+  <div class="header-right">
+    <h2>SHIP INSPECTION REPORT</h2>
+    <p>${dateStr}</p>
+  </div>
+</div>
+<div class="navy-bar"></div>
+
+<div class="vessel-box">
+  <h3>Vessel Information</h3>
+  <div class="vessel-grid">
+    <div class="vessel-field"><label>Vessel Name</label><span>${v.name||'—'}</span></div>
+    <div class="vessel-field"><label>Port</label><span>${v.port||'—'}</span></div>
+    <div class="vessel-field"><label>Flag</label><span>${v.flag||'—'}</span></div>
+    <div class="vessel-field"><label>IMO No.</label><span>${v.imo||'—'}</span></div>
+    <div class="vessel-field"><label>Type</label><span>${v.type||'—'}</span></div>
+    <div class="vessel-field"><label>Job Ref.</label><span>${v.jobRef||'—'}</span></div>
+    <div class="vessel-field"><label>Date</label><span>${dateStr}</span></div>
+    <div class="vessel-field"><label>Inspector</label><span>${v.inspector||'—'}</span></div>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-item green"><div class="val">${yes}</div><div class="lbl">✓ Satisfactory</div></div>
+  <div class="summary-item red"><div class="val">${no}</div><div class="lbl">✗ Deficiencies</div></div>
+  <div class="summary-item gray"><div class="val">${na}</div><div class="lbl">— Not Applicable</div></div>
+  <div class="summary-item"><div class="val">${yes+no+na}</div><div class="lbl">Total Items</div></div>
+</div>
+
+<div class="section-header">📋 INSPECTION CHECKLIST RESULTS</div>
+${checklistHTML}
+
+${defsHTML}
+
+${photosHTML}
+
+${matsHTML}
+
+${notesHTML}
+
+<div class="signature">
+  <h4>INSPECTOR'S DECLARATION</h4>
+  <p>I hereby certify that this inspection was carried out in accordance with TMB procedures and that the information contained herein is accurate and complete to the best of my knowledge.</p>
+  <div class="sig-line">
+    <div class="sig-field"><div class="line"></div><label>Inspector: ${v.inspector||'—'}</label></div>
+    <div class="sig-field"><div class="line"></div><label>Signature</label></div>
+    <div class="sig-field"><div class="line"></div><label>Date</label></div>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Technical Maritime Bureau SL  ·  Las Palmas de Gran Canaria  ·  info@technicalmb.net  ·  +34 928 271 172</span>
+  <span>VAT: B76270172</span>
+</div>
+
+<script>
+  window.onload = () => window.print();
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    // Si el navegador bloquea popups, descarga como HTML
+    const blob = new Blob([html], {type:'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'TMB_Informe_' + (v.name||'inspeccion').replace(/\s+/g,'_') + '.html';
+    a.click();
+    showToast('📄 Informe descargado — ábrelo y usa Imprimir → PDF');
+    return null;
   }
-  // Firma
-  npi(35);y+=4;
-  doc.setFillColor(...LIGHT);doc.rect(ML,y,W-ML-MR,28,'F');doc.setFillColor(...NAVY);doc.rect(ML,y,3,28,'F');
-  sf('bold',9,NAVY);doc.text("INSPECTOR'S DECLARATION",ML+7,y+6);
-  sf('normal',8,NAVYM);doc.text('I hereby certify that this inspection was carried out in accordance with TMB procedures and that',ML+7,y+11);
-  doc.text('the information contained herein is accurate and complete to the best of my knowledge.',ML+7,y+15.5);
-  sf('bold',8,NAVY);doc.text('Inspector:',ML+7,y+22);sf('normal',8,NAVYM);doc.text(v.inspector||'—',ML+28,y+22);
-  doc.setFillColor(...NAVY);doc.rect(W-MR-60,y+17,60,.5,'F');sf('normal',7,STEEL);doc.text('Signature',W-MR-30,y+22,{align:'center'});
-  // Pie en todas las páginas
-  const total=doc.internal.getNumberOfPages();for(let i=1;i<=total;i++){doc.setPage(i);addFtr();}
-  return doc;
+  win.document.write(html);
+  win.document.close();
+  return null;
 }
 // TMB Inspect — Main App Logic
 
