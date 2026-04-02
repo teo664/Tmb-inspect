@@ -8,20 +8,9 @@ const PORT = process.env.PORT || 3000;
 app.use(compression());
 app.use(express.static(__dirname));
 
-const routes = {
-  '/css/style.css':      'style.css',
-  '/js/app.js':          'app.js',
-  '/js/checklist.js':    'checklist.js',
-  '/js/pdf-gen.js':      'pdf-gen.js',
-  '/icons/logo.jpg':     'logo.jpg',
-  '/icons/icon-192.png': 'icon-192.png',
-  '/icons/icon-512.png': 'icon-512.png',
-};
-
-Object.entries(routes).forEach(([route, file]) => {
-  app.get(route, (req, res) => {
-    res.sendFile(path.join(__dirname, file));
-  });
+// Sirve jsPDF desde node_modules — sin depender de CDN externos
+app.get('/jspdf.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules/jspdf/dist/jspdf.umd.min.js'));
 });
 
 app.get('*', (req, res) => {
@@ -29,5 +18,5 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('TMB Inspect corriendo en puerto ' + PORT);
+  console.log('✅ TMB Inspect corriendo en puerto ' + PORT);
 });
