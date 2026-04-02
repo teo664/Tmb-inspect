@@ -6,23 +6,28 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(compression());
-app.use(express.static(path.join(__dirname, 'public'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('sw.js')) {
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Service-Worker-Allowed', '/');
-    }
-    if (filePath.endsWith('manifest.json')) {
-      res.setHeader('Cache-Control', 'no-cache');
-    }
-  }
-}));
+app.use(express.static(__dirname));
+
+const routes = {
+  '/css/style.css':      'style.css',
+  '/js/app.js':          'app.js',
+  '/js/checklist.js':    'checklist.js',
+  '/js/pdf-gen.js':      'pdf-gen.js',
+  '/icons/logo.jpg':     'logo.jpg',
+  '/icons/icon-192.png': 'icon-192.png',
+  '/icons/icon-512.png': 'icon-512.png',
+};
+
+Object.entries(routes).forEach(([route, file]) => {
+  app.get(route, (req, res) => {
+    res.sendFile(path.join(__dirname, file));
+  });
+});
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n✅ TMB Inspect corriendo en http://localhost:${PORT}`);
-  console.log(`   Acceso en red local: http://TU-IP-LOCAL:${PORT}\n`);
+  console.log('TMB Inspect corriendo en puerto ' + PORT);
 });
