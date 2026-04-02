@@ -1,184 +1,927 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#C8102E">
-  <title>TMB Inspect</title>
-  <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#C8102E">
+<title>TMB Inspect</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap');
 
-  <!-- PWA icons for iOS -->
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+:root {
+–red: #C8102E;
+–red-dark: #9e0c24;
+–navy: #1F2D3D;
+–navy-mid: #2c3e50;
+–navy-light: #354a5e;
+–steel: #7f8c9a;
+–light: #F4F6F8;
+–white: #ffffff;
+–green: #1a9e5c;
+–green-bg: #e8f7f0;
+–amber: #e67e22;
+–amber-bg: #fdf3e7;
+–gray: #95a5a6;
+–gray-bg: #ecf0f1;
+–border: #d5dce4;
+–shadow: 0 2px 12px rgba(31,45,61,0.12);
+–radius: 12px;
+–radius-sm: 8px;
+}
 
-  <!-- jsPDF from CDN -->
-  <script src="<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-"></script>
+- { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { font-size: 16px; }
+
+body {
+font-family: ‘Barlow’, sans-serif;
+background: var(–light);
+color: var(–navy);
+min-height: 100vh;
+display: flex;
+flex-direction: column;
+overflow-x: hidden;
+}
+
+/* ── HEADER ─────────────────────────────────────────────── */
+#app-header {
+background: var(–navy);
+color: var(–white);
+padding: 0;
+position: sticky;
+top: 0;
+z-index: 100;
+box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+}
+
+.header-top {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 12px 16px;
+}
+
+.header-logo {
+display: flex;
+align-items: center;
+gap: 10px;
+}
+
+.header-logo-img {
+width: 38px;
+height: 38px;
+object-fit: contain;
+border-radius: 4px;
+background: white;
+padding: 2px;
+}
+
+.header-logo .logo-text {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 16px;
+font-weight: 600;
+letter-spacing: 0.5px;
+line-height: 1.2;
+}
+.header-logo .logo-text span {
+display: block;
+font-size: 11px;
+font-weight: 400;
+color: var(–steel);
+letter-spacing: 0.3px;
+}
+
+#vessel-label {
+font-size: 11px;
+color: var(–steel);
+text-align: right;
+max-width: 140px;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+#vessel-label strong {
+display: block;
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 13px;
+color: var(–white);
+font-weight: 600;
+}
+
+/* ── PROGRESS BAR ─────────────────────────────────────────── */
+.progress-wrap {
+display: flex;
+background: var(–navy-mid);
+padding: 8px 16px 10px;
+gap: 4px;
+align-items: center;
+overflow-x: auto;
+scrollbar-width: none;
+}
+.progress-wrap::-webkit-scrollbar { display: none; }
+
+.step-pill {
+display: flex;
+align-items: center;
+gap: 6px;
+padding: 5px 10px;
+border-radius: 20px;
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 12px;
+font-weight: 600;
+letter-spacing: 0.3px;
+white-space: nowrap;
+background: var(–navy-light);
+color: var(–steel);
+cursor: pointer;
+transition: all 0.2s;
+border: none;
+flex-shrink: 0;
+}
+
+.step-pill .step-num {
+width: 18px;
+height: 18px;
+border-radius: 50%;
+background: var(–steel);
+color: var(–navy);
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 10px;
+font-weight: 700;
+}
+
+.step-pill.active {
+background: var(–red);
+color: white;
+}
+.step-pill.active .step-num {
+background: white;
+color: var(–red);
+}
+.step-pill.done {
+background: rgba(26,158,92,0.2);
+color: #1a9e5c;
+}
+.step-pill.done .step-num {
+background: #1a9e5c;
+color: white;
+}
+.step-pill.done .step-num::after { content: ‘✓’; }
+
+.step-separator {
+color: var(–steel);
+font-size: 10px;
+flex-shrink: 0;
+}
+
+/* ── SCREENS ──────────────────────────────────────────────── */
+.screen { display: none; flex-direction: column; flex: 1; padding: 16px; gap: 16px; }
+.screen.active { display: flex; animation: fadeUp 0.25s ease; }
+
+@keyframes fadeUp {
+from { opacity: 0; transform: translateY(12px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SCREEN 0: HOME ───────────────────────────────────────── */
+.home-hero {
+background: linear-gradient(135deg, var(–navy) 0%, var(–navy-mid) 100%);
+border-radius: var(–radius);
+padding: 28px 20px;
+text-align: center;
+color: white;
+position: relative;
+overflow: hidden;
+}
+.home-hero::before {
+content: ‘’;
+position: absolute;
+top: -30px; right: -30px;
+width: 120px; height: 120px;
+background: var(–red);
+opacity: 0.15;
+border-radius: 50%;
+}
+.home-hero::after {
+content: ‘’;
+position: absolute;
+bottom: -40px; left: -20px;
+width: 140px; height: 140px;
+background: var(–red);
+opacity: 0.08;
+border-radius: 50%;
+}
+.home-hero .hero-icon { font-size: 48px; margin-bottom: 12px; }
+.home-hero h1 {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 26px;
+font-weight: 800;
+letter-spacing: 0.5px;
+margin-bottom: 6px;
+}
+.home-hero p {
+font-size: 14px;
+color: #8da0b3;
+line-height: 1.5;
+}
+
+.btn-primary {
+background: var(–red);
+color: white;
+border: none;
+padding: 16px 24px;
+border-radius: var(–radius);
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 17px;
+font-weight: 700;
+letter-spacing: 0.5px;
+cursor: pointer;
+width: 100%;
+transition: background 0.2s, transform 0.1s;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 8px;
+}
+.btn-primary:active { transform: scale(0.98); background: var(–red-dark); }
+
+.btn-secondary {
+background: white;
+color: var(–navy);
+border: 1.5px solid var(–border);
+padding: 12px 20px;
+border-radius: var(–radius);
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 15px;
+font-weight: 600;
+cursor: pointer;
+width: 100%;
+transition: all 0.2s;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 8px;
+}
+.btn-secondary:active { background: var(–light); }
+
+.btn-ghost {
+background: transparent;
+color: var(–steel);
+border: none;
+padding: 8px 12px;
+border-radius: var(–radius-sm);
+font-size: 13px;
+cursor: pointer;
+}
+
+/* saved inspections list */
+.section-title {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 14px;
+font-weight: 700;
+letter-spacing: 1.5px;
+text-transform: uppercase;
+color: var(–steel);
+margin-bottom: 8px;
+}
+
+.inspection-card {
+background: white;
+border-radius: var(–radius);
+padding: 14px 16px;
+box-shadow: var(–shadow);
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+cursor: pointer;
+transition: transform 0.15s;
+border-left: 3px solid var(–red);
+}
+.inspection-card:active { transform: scale(0.99); }
+
+.inspection-card .ic-info { flex: 1; }
+.inspection-card .ic-name {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 16px;
+font-weight: 700;
+color: var(–navy);
+}
+.inspection-card .ic-meta {
+font-size: 12px;
+color: var(–steel);
+margin-top: 2px;
+}
+.inspection-card .ic-arrow { color: var(–steel); font-size: 18px; }
+
+.ic-delete {
+background: none;
+border: none;
+color: var(–steel);
+font-size: 18px;
+cursor: pointer;
+padding: 4px;
+}
+.ic-delete:active { color: var(–red); }
+
+/* ── FORM STYLES ──────────────────────────────────────────── */
+.card {
+background: white;
+border-radius: var(–radius);
+padding: 18px 16px;
+box-shadow: var(–shadow);
+}
+.card-title {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 18px;
+font-weight: 700;
+color: var(–navy);
+margin-bottom: 16px;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.card-title .card-icon { font-size: 20px; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label {
+display: block;
+font-size: 12px;
+font-weight: 600;
+color: var(–steel);
+letter-spacing: 0.5px;
+text-transform: uppercase;
+margin-bottom: 5px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+width: 100%;
+padding: 11px 14px;
+border: 1.5px solid var(–border);
+border-radius: var(–radius-sm);
+font-family: ‘Barlow’, sans-serif;
+font-size: 15px;
+color: var(–navy);
+background: white;
+outline: none;
+transition: border-color 0.2s;
+-webkit-appearance: none;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+border-color: var(–red);
+}
+.form-group textarea { resize: vertical; min-height: 80px; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── CHECKLIST ────────────────────────────────────────────── */
+.category-block {
+background: white;
+border-radius: var(–radius);
+overflow: hidden;
+box-shadow: var(–shadow);
+}
+
+.category-header {
+background: var(–navy);
+color: white;
+padding: 13px 16px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+cursor: pointer;
+user-select: none;
+}
+.category-header .cat-left {
+display: flex;
+align-items: center;
+gap: 10px;
+}
+.category-header .cat-icon { font-size: 20px; }
+.category-header .cat-title {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 16px;
+font-weight: 700;
+letter-spacing: 0.3px;
+}
+.category-header .cat-count {
+font-size: 11px;
+color: var(–steel);
+margin-top: 1px;
+}
+.category-header .cat-arrow {
+font-size: 16px;
+transition: transform 0.2s;
+color: var(–steel);
+}
+.category-block.open .cat-arrow { transform: rotate(180deg); }
+
+.category-items { display: none; }
+.category-block.open .category-items { display: block; }
+
+.check-item {
+display: flex;
+align-items: center;
+padding: 11px 14px;
+border-bottom: 1px solid var(–light);
+gap: 10px;
+}
+.check-item:last-child { border-bottom: none; }
+
+.check-item-text {
+flex: 1;
+font-size: 13.5px;
+line-height: 1.4;
+color: var(–navy-mid);
+}
+
+.check-btns {
+display: flex;
+gap: 4px;
+flex-shrink: 0;
+}
+
+.check-btn {
+padding: 5px 10px;
+border-radius: 6px;
+border: 1.5px solid var(–border);
+background: white;
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 12px;
+font-weight: 700;
+cursor: pointer;
+color: var(–steel);
+transition: all 0.15s;
+letter-spacing: 0.3px;
+}
+.check-btn.yes.active { background: var(–green); border-color: var(–green); color: white; }
+.check-btn.no.active  { background: var(–red);   border-color: var(–red);   color: white; }
+.check-btn.na.active  { background: var(–gray);  border-color: var(–gray);  color: white; }
+
+/* progress ring */
+.cat-progress {
+display: flex;
+align-items: center;
+gap: 8px;
+margin-left: 8px;
+}
+.cat-progress-bar {
+width: 60px;
+height: 4px;
+background: rgba(255,255,255,0.2);
+border-radius: 2px;
+overflow: hidden;
+}
+.cat-progress-fill {
+height: 100%;
+background: var(–green);
+border-radius: 2px;
+transition: width 0.3s;
+}
+.cat-progress-text {
+font-size: 11px;
+color: var(–steel);
+min-width: 28px;
+}
+
+.checklist-summary {
+background: var(–navy);
+border-radius: var(–radius);
+padding: 14px 16px;
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 8px;
+text-align: center;
+color: white;
+}
+.summary-stat .stat-val {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 28px;
+font-weight: 800;
+}
+.summary-stat .stat-label { font-size: 11px; color: var(–steel); }
+.summary-stat.yes .stat-val { color: #27ae60; }
+.summary-stat.no .stat-val  { color: var(–red); }
+.summary-stat.na .stat-val  { color: var(–gray); }
+
+/* ── PHOTOS ───────────────────────────────────────────────── */
+.photo-upload-area {
+background: var(–light);
+border: 2px dashed var(–border);
+border-radius: var(–radius);
+padding: 32px 20px;
+text-align: center;
+cursor: pointer;
+transition: border-color 0.2s;
+}
+.photo-upload-area:active { border-color: var(–red); }
+.photo-upload-area .upload-icon { font-size: 40px; margin-bottom: 10px; }
+.photo-upload-area p { font-size: 15px; color: var(–navy-mid); font-weight: 500; }
+.photo-upload-area span { font-size: 12px; color: var(–steel); }
+
+#photo-input { display: none; }
+
+.photo-grid {
+display: grid;
+grid-template-columns: repeat(2, 1fr);
+gap: 10px;
+}
+
+.photo-card {
+background: white;
+border-radius: var(–radius-sm);
+overflow: hidden;
+box-shadow: var(–shadow);
+position: relative;
+}
+.photo-card img {
+width: 100%;
+height: 130px;
+object-fit: cover;
+display: block;
+}
+.photo-card-footer {
+padding: 6px 8px;
+}
+.photo-card-footer input {
+width: 100%;
+border: none;
+font-family: ‘Barlow’, sans-serif;
+font-size: 12px;
+color: var(–navy-mid);
+outline: none;
+background: transparent;
+}
+.photo-card-footer input::placeholder { color: var(–steel); }
+.photo-delete {
+position: absolute;
+top: 5px; right: 5px;
+background: rgba(0,0,0,0.5);
+color: white;
+border: none;
+border-radius: 50%;
+width: 26px; height: 26px;
+font-size: 14px;
+cursor: pointer;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+/* ── MATERIALS ────────────────────────────────────────────── */
+.material-row {
+background: white;
+border-radius: var(–radius-sm);
+padding: 10px 12px;
+box-shadow: 0 1px 6px rgba(31,45,61,0.08);
+display: grid;
+grid-template-columns: 1fr 60px 60px 32px;
+gap: 8px;
+align-items: center;
+margin-bottom: 8px;
+}
+.material-row input, .material-row select {
+border: 1px solid var(–border);
+border-radius: 6px;
+padding: 7px 9px;
+font-size: 13px;
+font-family: ‘Barlow’, sans-serif;
+color: var(–navy);
+background: white;
+outline: none;
+width: 100%;
+-webkit-appearance: none;
+}
+.material-row input:focus, .material-row select:focus {
+border-color: var(–red);
+}
+.mat-delete {
+background: none;
+border: none;
+color: var(–steel);
+font-size: 18px;
+cursor: pointer;
+padding: 4px;
+}
+.mat-delete:active { color: var(–red); }
+
+.mat-header {
+display: grid;
+grid-template-columns: 1fr 60px 60px 32px;
+gap: 8px;
+padding: 0 4px;
+margin-bottom: 4px;
+}
+.mat-header span {
+font-size: 11px;
+font-weight: 600;
+color: var(–steel);
+text-transform: uppercase;
+letter-spacing: 0.5px;
+}
+
+/* ── PDF / REPORT SCREEN ──────────────────────────────────── */
+.report-preview {
+background: white;
+border-radius: var(–radius);
+padding: 18px 16px;
+box-shadow: var(–shadow);
+}
+.report-preview h3 {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 16px;
+font-weight: 700;
+color: var(–navy);
+margin-bottom: 12px;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+
+.report-stat-row {
+display: flex;
+gap: 10px;
+margin-bottom: 10px;
+flex-wrap: wrap;
+}
+.report-stat {
+flex: 1;
+min-width: 80px;
+background: var(–light);
+border-radius: var(–radius-sm);
+padding: 10px;
+text-align: center;
+}
+.report-stat .rs-val {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 24px;
+font-weight: 800;
+color: var(–navy);
+}
+.report-stat .rs-label { font-size: 11px; color: var(–steel); }
+.report-stat.green .rs-val { color: var(–green); }
+.report-stat.red .rs-val { color: var(–red); }
+.report-stat.blue .rs-val { color: var(–navy); }
+
+.notes-area {
+width: 100%;
+padding: 12px 14px;
+border: 1.5px solid var(–border);
+border-radius: var(–radius-sm);
+font-family: ‘Barlow’, sans-serif;
+font-size: 14px;
+color: var(–navy);
+resize: vertical;
+min-height: 90px;
+outline: none;
+}
+.notes-area:focus { border-color: var(–red); }
+
+.btn-generate {
+background: var(–red);
+color: white;
+border: none;
+padding: 18px 24px;
+border-radius: var(–radius);
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 20px;
+font-weight: 800;
+letter-spacing: 0.5px;
+cursor: pointer;
+width: 100%;
+transition: background 0.2s, transform 0.1s;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 10px;
+position: relative;
+overflow: hidden;
+}
+.btn-generate:active { transform: scale(0.98); background: var(–red-dark); }
+.btn-generate::after {
+content: ‘’;
+position: absolute;
+inset: 0;
+background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 100%);
+}
+.btn-share {
+background: var(–navy);
+color: white;
+border: none;
+padding: 14px 24px;
+border-radius: var(–radius);
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 17px;
+font-weight: 700;
+cursor: pointer;
+width: 100%;
+transition: background 0.2s;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 8px;
+}
+.btn-share:active { background: var(–navy-mid); }
+
+/* ── NAV BUTTONS ──────────────────────────────────────────── */
+.nav-row {
+display: flex;
+gap: 10px;
+padding-bottom: 16px;
+}
+.btn-nav-prev {
+background: white;
+color: var(–navy);
+border: 1.5px solid var(–border);
+padding: 13px 20px;
+border-radius: var(–radius);
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 16px;
+font-weight: 600;
+cursor: pointer;
+flex: 0 0 auto;
+transition: all 0.2s;
+}
+.btn-nav-next {
+background: var(–red);
+color: white;
+border: none;
+padding: 13px 20px;
+border-radius: var(–radius);
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 16px;
+font-weight: 700;
+cursor: pointer;
+flex: 1;
+transition: all 0.2s;
+}
+.btn-nav-next:active { background: var(–red-dark); }
+
+/* ── TOAST ────────────────────────────────────────────────── */
+#toast {
+position: fixed;
+bottom: 20px;
+left: 50%;
+transform: translateX(-50%) translateY(80px);
+background: var(–navy);
+color: white;
+padding: 12px 20px;
+border-radius: 24px;
+font-size: 14px;
+font-weight: 500;
+z-index: 999;
+transition: transform 0.3s ease;
+pointer-events: none;
+white-space: nowrap;
+box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ── LOADING OVERLAY ──────────────────────────────────────── */
+#loading {
+display: none;
+position: fixed;
+inset: 0;
+background: rgba(31,45,61,0.85);
+z-index: 500;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+color: white;
+gap: 16px;
+}
+#loading.show { display: flex; }
+#loading .spinner {
+width: 48px; height: 48px;
+border: 4px solid rgba(255,255,255,0.2);
+border-top-color: var(–red);
+border-radius: 50%;
+animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading p {
+font-family: ‘Barlow Condensed’, sans-serif;
+font-size: 18px;
+font-weight: 600;
+letter-spacing: 0.5px;
+}
+
+/* ── EMPTY STATE ──────────────────────────────────────────── */
+.empty-state {
+text-align: center;
+padding: 30px 20px;
+color: var(–steel);
+}
+.empty-state .es-icon { font-size: 40px; margin-bottom: 10px; }
+.empty-state p { font-size: 14px; }
+
+/* ── SCROLLBAR ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(–border); border-radius: 2px; }
+
+@media (min-width: 600px) {
+body { max-width: 480px; margin: 0 auto; box-shadow: 0 0 40px rgba(0,0,0,0.15); }
+}
+</style>
+
 </head>
 <body>
 
-<!-- ── HEADER ─────────────────────────────────────────── -->
 <header id="app-header">
   <div class="header-top">
     <div class="header-logo">
-      <img src="/icons/logo.jpg" alt="TMB" class="header-logo-img">
-      <div class="logo-text">
-        Inspect
-        <span>Technical Maritime Bureau</span>
-      </div>
+      <img src="/logo.jpg" alt="TMB" class="header-logo-img" onerror="this.style.display='none'">
+      <div class="logo-text">Inspect<span>Technical Maritime Bureau</span></div>
     </div>
     <div id="vessel-label"><span>Sin buque seleccionado</span></div>
   </div>
-
   <div class="progress-wrap">
-    <button class="step-pill" data-step="1">
-      <span class="step-num">1</span> Buque
-    </button>
+    <button class="step-pill" data-step="1"><span class="step-num">1</span> Buque</button>
     <span class="step-separator">›</span>
-    <button class="step-pill" data-step="2">
-      <span class="step-num">2</span> Checklist
-    </button>
+    <button class="step-pill" data-step="2"><span class="step-num">2</span> Checklist</button>
     <span class="step-separator">›</span>
-    <button class="step-pill" data-step="3">
-      <span class="step-num">3</span> Fotos
-    </button>
+    <button class="step-pill" data-step="3"><span class="step-num">3</span> Fotos</button>
     <span class="step-separator">›</span>
-    <button class="step-pill" data-step="4">
-      <span class="step-num">4</span> Materiales
-    </button>
+    <button class="step-pill" data-step="4"><span class="step-num">4</span> Materiales</button>
     <span class="step-separator">›</span>
-    <button class="step-pill" data-step="5">
-      <span class="step-num">5</span> Informe
-    </button>
+    <button class="step-pill" data-step="5"><span class="step-num">5</span> Informe</button>
   </div>
 </header>
 
-<!-- ── SCREEN 0: HOME ──────────────────────────────────── -->
 <div class="screen active" id="screen-0">
   <div class="home-hero">
     <div class="hero-icon">🚢</div>
     <h1>Ship Inspection</h1>
     <p>Aplicación de inspección naval para técnicos de TMB. Checklist, fotos y generación de informe PDF.</p>
   </div>
-
-  <button class="btn-primary" id="btn-new">
-    ➕ Nueva Inspección
-  </button>
-
+  <button class="btn-primary" id="btn-new">➕ Nueva Inspección</button>
   <div>
     <div class="section-title">Inspecciones guardadas</div>
     <div id="saved-list"></div>
   </div>
 </div>
 
-<!-- ── SCREEN 1: VESSEL INFO ────────────────────────────── -->
 <div class="screen" id="screen-1">
   <div class="card">
     <div class="card-title"><span class="card-icon">🚢</span> Datos del Buque</div>
-
-    <div class="form-group">
-      <label>Nombre del Buque *</label>
-      <input type="text" id="v-name" placeholder="M/V Sea Cloud Spirit" autocomplete="off">
-    </div>
-
+    <div class="form-group"><label>Nombre del Buque *</label><input type="text" id="v-name" placeholder="M/V Sea Cloud Spirit" autocomplete="off"></div>
     <div class="form-row">
-      <div class="form-group">
-        <label>Pabellón / Flag</label>
-        <input type="text" id="v-flag" placeholder="Panama">
-      </div>
-      <div class="form-group">
-        <label>IMO / Matrícula</label>
-        <input type="text" id="v-imo" placeholder="IMO 9400398">
-      </div>
+      <div class="form-group"><label>Pabellón / Flag</label><input type="text" id="v-flag" placeholder="Panama"></div>
+      <div class="form-group"><label>IMO / Matrícula</label><input type="text" id="v-imo" placeholder="IMO 9400398"></div>
     </div>
-
     <div class="form-group">
       <label>Tipo de Buque / Vessel Type</label>
       <select id="v-type">
         <option value="">Seleccionar tipo...</option>
-        <option value="General Cargo Vessel">General Cargo Vessel</option>
-        <option value="Bulk Carrier">Bulk Carrier</option>
-        <option value="Container Vessel">Container Vessel</option>
-        <option value="Tanker">Tanker</option>
-        <option value="Chemical Tanker">Chemical Tanker</option>
-        <option value="Cruise Ship">Cruise Ship</option>
-        <option value="Passenger Vessel">Passenger Vessel</option>
-        <option value="Ro-Ro Vessel">Ro-Ro Vessel</option>
-        <option value="Fishing Vessel">Fishing Vessel</option>
-        <option value="Supply Vessel / OSV">Supply Vessel / OSV</option>
-        <option value="Tug Boat">Tug Boat</option>
-        <option value="Dredger">Dredger</option>
-        <option value="Yacht / Motor Vessel">Yacht / Motor Vessel</option>
-        <option value="Sailing Vessel">Sailing Vessel</option>
-        <option value="Other">Other</option>
+        <option>General Cargo Vessel</option><option>Bulk Carrier</option><option>Container Vessel</option>
+        <option>Tanker</option><option>Chemical Tanker</option><option>Cruise Ship</option>
+        <option>Passenger Vessel</option><option>Ro-Ro Vessel</option><option>Fishing Vessel</option>
+        <option>Supply Vessel / OSV</option><option>Tug Boat</option><option>Dredger</option>
+        <option>Yacht / Motor Vessel</option><option>Sailing Vessel</option><option>Other</option>
       </select>
     </div>
-
-    <div class="form-group">
-      <label>Puerto / Port of Inspection</label>
-      <input type="text" id="v-port" placeholder="Las Palmas de Gran Canaria">
-    </div>
-
+    <div class="form-group"><label>Puerto / Port of Inspection</label><input type="text" id="v-port" placeholder="Las Palmas de Gran Canaria"></div>
     <div class="form-row">
-      <div class="form-group">
-        <label>Fecha / Date *</label>
-        <input type="date" id="v-date">
-      </div>
-      <div class="form-group">
-        <label>Ref. Trabajo / Job Ref.</label>
-        <input type="text" id="v-jobref" placeholder="TMB-2026-XXX">
-      </div>
+      <div class="form-group"><label>Fecha / Date *</label><input type="date" id="v-date"></div>
+      <div class="form-group"><label>Ref. Trabajo / Job Ref.</label><input type="text" id="v-jobref" placeholder="TMB-2026-XXX"></div>
     </div>
-
-    <div class="form-group">
-      <label>Inspector *</label>
-      <input type="text" id="v-inspector" placeholder="Nombre del inspector">
-    </div>
+    <div class="form-group"><label>Inspector *</label><input type="text" id="v-inspector" placeholder="Nombre del inspector"></div>
   </div>
-
   <div class="nav-row">
     <button class="btn-nav-prev" id="btn-prev-vessel">‹ Inicio</button>
     <button class="btn-nav-next" id="btn-next-vessel">Checklist ›</button>
   </div>
 </div>
 
-<!-- ── SCREEN 2: CHECKLIST ──────────────────────────────── -->
 <div class="screen" id="screen-2">
-
   <div class="checklist-summary">
-    <div class="summary-stat yes">
-      <div class="stat-val" id="sum-yes">0</div>
-      <div class="stat-label">✓ Conforme</div>
-    </div>
-    <div class="summary-stat no">
-      <div class="stat-val" id="sum-no">0</div>
-      <div class="stat-label">✗ Deficiencia</div>
-    </div>
-    <div class="summary-stat na">
-      <div class="stat-val" id="sum-na">0</div>
-      <div class="stat-label">— N/A</div>
-    </div>
+    <div class="summary-stat yes"><div class="stat-val" id="sum-yes">0</div><div class="stat-label">✓ Conforme</div></div>
+    <div class="summary-stat no"><div class="stat-val" id="sum-no">0</div><div class="stat-label">✗ Deficiencia</div></div>
+    <div class="summary-stat na"><div class="stat-val" id="sum-na">0</div><div class="stat-label">— N/A</div></div>
   </div>
-
   <div id="checklist-container"></div>
-
   <div class="nav-row">
     <button class="btn-nav-prev" id="btn-prev-check">‹ Buque</button>
     <button class="btn-nav-next" id="btn-next-check">Fotos ›</button>
   </div>
 </div>
 
-<!-- ── SCREEN 3: PHOTOS ─────────────────────────────────── -->
 <div class="screen" id="screen-3">
-
   <div class="card" style="padding:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="card-title" style="margin:0"><span class="card-icon">📷</span> Fotos de Inspección</div>
       <span id="photo-count" style="font-size:13px;color:#7f8c9a">Sin fotos</span>
     </div>
-
     <div class="photo-upload-area" id="btn-add-photo">
       <div class="upload-icon">📸</div>
       <p>Tomar foto o subir desde galería</p>
@@ -186,95 +929,836 @@
     </div>
     <input type="file" id="photo-input" accept="image/*" capture="environment" multiple>
   </div>
-
   <div class="photo-grid" id="photo-grid"></div>
-
   <div class="nav-row">
     <button class="btn-nav-prev" id="btn-prev-photos">‹ Checklist</button>
     <button class="btn-nav-next" id="btn-next-photos">Materiales ›</button>
   </div>
 </div>
 
-<!-- ── SCREEN 4: MATERIALS ──────────────────────────────── -->
 <div class="screen" id="screen-4">
-
   <div class="card" style="padding:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="card-title" style="margin:0"><span class="card-icon">📦</span> Materiales Necesarios</div>
       <button class="btn-primary" id="btn-add-material" style="width:auto;padding:8px 14px;font-size:14px">+ Añadir</button>
     </div>
-    <div class="mat-header">
-      <span>Descripción</span>
-      <span>Cant.</span>
-      <span>Unidad</span>
-      <span></span>
-    </div>
+    <div class="mat-header"><span>Descripción</span><span>Cant.</span><span>Unidad</span><span></span></div>
   </div>
-
   <div id="materials-list"></div>
-
   <div class="nav-row">
     <button class="btn-nav-prev" id="btn-prev-materials">‹ Fotos</button>
     <button class="btn-nav-next" id="btn-next-materials">Informe ›</button>
   </div>
 </div>
 
-<!-- ── SCREEN 5: REPORT ─────────────────────────────────── -->
 <div class="screen" id="screen-5">
-
   <div class="report-preview">
     <h3>📊 Resumen de la Inspección</h3>
     <div class="report-stat-row">
-      <div class="report-stat green">
-        <div class="rs-val" id="rp-yes">0</div>
-        <div class="rs-label">Conforme</div>
-      </div>
-      <div class="report-stat red">
-        <div class="rs-val" id="rp-no">0</div>
-        <div class="rs-label">Deficiencias</div>
-      </div>
-      <div class="report-stat blue">
-        <div class="rs-val" id="rp-photos">0</div>
-        <div class="rs-label">Fotos</div>
-      </div>
-      <div class="report-stat blue">
-        <div class="rs-val" id="rp-materials">0</div>
-        <div class="rs-label">Materiales</div>
-      </div>
+      <div class="report-stat green"><div class="rs-val" id="rp-yes">0</div><div class="rs-label">Conforme</div></div>
+      <div class="report-stat red"><div class="rs-val" id="rp-no">0</div><div class="rs-label">Deficiencias</div></div>
+      <div class="report-stat blue"><div class="rs-val" id="rp-photos">0</div><div class="rs-label">Fotos</div></div>
+      <div class="report-stat blue"><div class="rs-val" id="rp-materials">0</div><div class="rs-label">Materiales</div></div>
     </div>
   </div>
-
   <div class="card">
     <div class="card-title"><span class="card-icon">📝</span> Notas del Inspector</div>
-    <textarea class="notes-area" id="report-notes"
-      placeholder="Observaciones adicionales, condiciones del trabajo, notas para el equipo..."></textarea>
+    <textarea class="notes-area" id="report-notes" placeholder="Observaciones adicionales, condiciones del trabajo, notas para el equipo..."></textarea>
   </div>
-
-  <button class="btn-generate" id="btn-generate-pdf">
-    📄 Generar Informe PDF
-  </button>
-
-  <button class="btn-share" id="btn-share" style="display:none">
-    ↑ Compartir Informe
-  </button>
-
+  <button class="btn-generate" id="btn-generate-pdf">📄 Generar Informe PDF</button>
+  <button class="btn-share" id="btn-share" style="display:none">↑ Compartir Informe</button>
   <div class="nav-row">
     <button class="btn-nav-prev" id="btn-prev-report">‹ Materiales</button>
     <button class="btn-ghost" onclick="showScreen(0); renderHomeScreen()">🏠 Inicio</button>
   </div>
 </div>
 
-<!-- ── TOAST ───────────────────────────────────────────── -->
 <div id="toast"></div>
+<div id="loading"><div class="spinner"></div><p id="loading-msg">Generando PDF...</p></div>
 
-<!-- ── LOADING ─────────────────────────────────────────── -->
-<div id="loading">
-  <div class="spinner"></div>
-  <p id="loading-msg">Generando PDF...</p>
-</div>
+<script>
+const CHECKLIST_DATA = [
+  {
+    id: 'safety',
+    icon: '⛑️',
+    title: 'Seguridad / Safety',
+    items: [
+      { id: 's1', text: 'EPIs disponibles y en buen estado', en: 'PPE available and in good condition' },
+      { id: 's2', text: 'Permiso de trabajo firmado y vigente', en: 'Work permit signed and valid' },
+      { id: 's3', text: 'Procedimientos de emergencia conocidos por el equipo', en: 'Emergency procedures known by team' },
+      { id: 's4', text: 'Extintores operativos y accesibles en zona de trabajo', en: 'Fire extinguishers operational and accessible' },
+      { id: 's5', text: 'Vías de escape despejadas y señalizadas', en: 'Escape routes clear and marked' },
+      { id: 's6', text: 'Iluminación adecuada en la zona de trabajo', en: 'Adequate lighting in work area' },
+      { id: 's7', text: 'Detector de gas disponible (espacios confinados)', en: 'Gas detector available (confined spaces)' },
+      { id: 's8', text: 'Permiso de trabajo en espacios confinados si aplica', en: 'Confined space entry permit if applicable' },
+    ]
+  },
+  {
+    id: 'hull',
+    icon: '🚢',
+    title: 'Casco y Estructura / Hull & Structure',
+    items: [
+      { id: 'h1', text: 'Condición general de la pintura del casco', en: 'General hull paint condition acceptable' },
+      { id: 'h2', text: 'Ausencia de corrosión severa o picaduras profundas', en: 'No severe corrosion or deep pitting' },
+      { id: 'h3', text: 'Sin daños estructurales visibles (abolladuras, grietas)', en: 'No visible structural damage (dents, cracks)' },
+      { id: 'h4', text: 'Estado de soldaduras en zonas críticas aceptable', en: 'Welds in critical areas in good condition' },
+      { id: 'h5', text: 'Ánodos de sacrificio en estado aceptable', en: 'Sacrificial anodes in acceptable condition' },
+      { id: 'h6', text: 'Cajas de mar sin obstrucciones ni corrosión', en: 'Sea chests unobstructed and free of corrosion' },
+      { id: 'h7', text: 'Bocina / tubo de bocina sin signos de fuga', en: 'Stern tube / shaft seal no visible leaks' },
+      { id: 'h8', text: 'Timón y mecha del timón en buen estado', en: 'Rudder and rudder stock in good condition' },
+    ]
+  },
+  {
+    id: 'deck',
+    icon: '⚓',
+    title: 'Cubierta / Deck',
+    items: [
+      { id: 'd1', text: 'Estado general de la cubierta aceptable', en: 'General deck condition acceptable' },
+      { id: 'd2', text: 'Escotillas y tapas en buen estado y estancas', en: 'Hatches and covers in good condition and watertight' },
+      { id: 'd3', text: 'Barandillas, candeleros y tensores en buen estado', en: 'Railings, stanchions and wire ropes in good condition' },
+      { id: 'd4', text: 'Equipo de amarre (bitas, guías, roldanas) operativo', en: 'Mooring equipment (bollards, fairleads, rollers) operational' },
+      { id: 'd5', text: 'Anclas y cadenas en buen estado', en: 'Anchors and anchor chains in good condition' },
+      { id: 'd6', text: 'Winches y maquinillas de amarre operativos', en: 'Mooring winches and windlasses operational' },
+      { id: 'd7', text: 'Grúas y plumas en buen estado (si aplica)', en: 'Cranes and derricks in good condition (if applicable)' },
+      { id: 'd8', text: 'Sistema de achique de cubierta sin obstrucciones', en: 'Deck drainage system unobstructed' },
+    ]
+  },
+  {
+    id: 'machinery',
+    icon: '⚙️',
+    title: 'Maquinaria Principal / Main Machinery',
+    items: [
+      { id: 'm1', text: 'Estado general del motor principal aceptable', en: 'Main engine general condition acceptable' },
+      { id: 'm2', text: 'Caja reductora sin fugas de aceite ni ruidos anómalos', en: 'Gearbox no oil leaks or abnormal noises' },
+      { id: 'm3', text: 'Hélice sin daños visibles (cavitación, golpes)', en: 'Propeller no visible damage (cavitation, impact)' },
+      { id: 'm4', text: 'Sistema de combustible sin fugas', en: 'Fuel system no leaks' },
+      { id: 'm5', text: 'Sistema de refrigeración operativo', en: 'Cooling system operational' },
+      { id: 'm6', text: 'Sistema de lubricación sin fugas', en: 'Lubrication system no leaks' },
+      { id: 'm7', text: 'Sistema de escape en buen estado', en: 'Exhaust system in good condition' },
+      { id: 'm8', text: 'Sin vibraciones anómalas detectadas', en: 'No abnormal vibrations detected' },
+    ]
+  },
+  {
+    id: 'auxiliary',
+    icon: '🔧',
+    title: 'Sistemas Auxiliares / Auxiliary Systems',
+    items: [
+      { id: 'a1', text: 'Generadores auxiliares operativos', en: 'Auxiliary generators operational' },
+      { id: 'a2', text: 'Bombas de lastre/sentinas operativas', en: 'Ballast/bilge pumps operational' },
+      { id: 'a3', text: 'Separador de aguas aceitosas operativo', en: 'Oily water separator operational' },
+      { id: 'a4', text: 'Sistema de gobierno operativo y sin juego excesivo', en: 'Steering system operational, no excessive play' },
+      { id: 'a5', text: 'Compresor de aire en buen estado', en: 'Air compressor in good condition' },
+      { id: 'a6', text: 'Sistema hidráulico sin fugas', en: 'Hydraulic system no leaks' },
+      { id: 'a7', text: 'Tuberías y válvulas de mar en buen estado', en: 'Seawater pipework and sea valves in good condition' },
+    ]
+  },
+  {
+    id: 'electrical',
+    icon: '⚡',
+    title: 'Sistema Eléctrico / Electrical Systems',
+    items: [
+      { id: 'e1', text: 'Panel eléctrico principal en buen estado', en: 'Main electrical panel in good condition' },
+      { id: 'e2', text: 'Generador de emergencia operativo', en: 'Emergency generator operational' },
+      { id: 'e3', text: 'Luces de navegación operativas', en: 'Navigation lights operational' },
+      { id: 'e4', text: 'Cableado sin daños visibles, fijaciones adecuadas', en: 'No visible cable damage, adequate fixings' },
+      { id: 'e5', text: 'Toma de corriente en tierra en buen estado', en: 'Shore power connection in good condition' },
+      { id: 'e6', text: 'Baterías de arranque en buen estado', en: 'Starting batteries in good condition' },
+    ]
+  },
+  {
+    id: 'engine_room',
+    icon: '🏭',
+    title: 'Sala de Máquinas / Engine Room',
+    items: [
+      { id: 'er1', text: 'Nivel de sentinas aceptable', en: 'Bilge level acceptable' },
+      { id: 'er2', text: 'Sin fugas de aceite en maquinaria', en: 'No oil leaks in machinery' },
+      { id: 'er3', text: 'Sin fugas de combustible', en: 'No fuel leaks' },
+      { id: 'er4', text: 'Ventilación de sala de máquinas adecuada', en: 'Engine room ventilation adequate' },
+      { id: 'er5', text: 'Equipos contraincendios presentes y operativos', en: 'Firefighting equipment present and operational' },
+      { id: 'er6', text: 'Limpieza general de sala de máquinas aceptable', en: 'Engine room general cleanliness acceptable' },
+    ]
+  },
+  {
+    id: 'safety_equip',
+    icon: '🦺',
+    title: 'Equipos de Salvamento / Life-Saving Equipment',
+    items: [
+      { id: 'se1', text: 'Balsas salvavidas en buen estado y certificadas', en: 'Life rafts in good condition and certified' },
+      { id: 'se2', text: 'Botes de rescate operativos (si aplica)', en: 'Rescue boats operational (if applicable)' },
+      { id: 'se3', text: 'Chalecos salvavidas suficientes y en buen estado', en: 'Sufficient life jackets in good condition' },
+      { id: 'se4', text: 'Aros salvavidas presentes y accesibles', en: 'Lifebuoys present and accessible' },
+      { id: 'se5', text: 'Bengalas y señales pirotécnicas vigentes', en: 'Flares and pyrotechnics within expiry date' },
+      { id: 'se6', text: 'EPIRB/SART operativo y dentro de fecha (si aplica)', en: 'EPIRB/SART operational and within expiry (if applicable)' },
+    ]
+  },
+  {
+    id: 'accommodation',
+    icon: '🛏️',
+    title: 'Habitabilidad / Accommodation',
+    items: [
+      { id: 'ac1', text: 'Estado general de camarotes aceptable', en: 'General cabin condition acceptable' },
+      { id: 'ac2', text: 'Cocina y comedor en buen estado', en: 'Galley and mess room in good condition' },
+      { id: 'ac3', text: 'Aseos y baños en buen estado', en: 'Toilets and bathrooms in good condition' },
+      { id: 'ac4', text: 'Sistema de agua dulce operativo', en: 'Fresh water system operational' },
+      { id: 'ac5', text: 'Sistema de climatización operativo (si aplica)', en: 'HVAC system operational (if applicable)' },
+    ]
+  },
+];
 
-<script src="/js/checklist.js"></script>
-<script src="/js/pdf-gen.js"></script>
-<script src="/js/app.js"></script>
+// ── jsPDF: carga dinámica con 3 CDNs de respaldo ─────────────
+async function ensureJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return;
+  const cdns = [
+    'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  ];
+  for (const cdn of cdns) {
+    try {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = cdn;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      if (window.jspdf && window.jspdf.jsPDF) return;
+    } catch(e) { continue; }
+  }
+  throw new Error('No se pudo cargar jsPDF. Comprueba tu conexión a internet.');
+}
+
+async function loadLogoBase64() {
+  try {
+    const resp = await fetch('/logo.jpg');
+    if (!resp.ok) throw new Error('not found');
+    const blob = await resp.blob();
+    return await new Promise(resolve => {
+      const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+async function generatePDF(inspection) {
+  await ensureJsPDF();
+  const logoBase64 = await loadLogoBase64();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const ML = 15, MR = 15, MT = 15; let y = MT;
+  const RED=[200,16,46],NAVY=[31,45,61],NAVYM=[44,62,80],STEEL=[127,140,154],WHITE=[255,255,255],GREEN=[26,158,92],LIGHT=[244,246,248];
+  const sf=(style,size,color)=>{doc.setFont('helvetica',style);doc.setFontSize(size);if(color)doc.setTextColor(...color);};
+  const npi=(n=20)=>{if(y+n>H-14){addFtr();doc.addPage();y=MT;addPH();}};
+  const addFtr=()=>{
+    const pg=doc.internal.getCurrentPageInfo().pageNumber;
+    doc.setFillColor(...NAVY);doc.rect(0,H-11,W,11,'F');
+    sf('normal',7.5,WHITE);
+    doc.text('Technical Maritime Bureau SL  ·  Las Palmas de Gran Canaria  ·  info@technicalmb.net  ·  +34 928 271 172',ML,H-4);
+    doc.text(`Pág. ${pg}`,W-MR,H-4,{align:'right'});
+  };
+  const addPH=()=>{
+    doc.setFillColor(...NAVY);doc.rect(0,0,W,12,'F');
+    doc.setFillColor(...RED);doc.rect(0,12,W,2,'F');
+    if(logoBase64){try{doc.addImage(logoBase64,'JPEG',ML,1,9,9);}catch(e){}}
+    sf('bold',9,WHITE);doc.text('TMB INSPECT  |  SHIP INSPECTION REPORT',ML+(logoBase64?12:0),8);
+    sf('normal',8,STEEL);doc.text(`M/V ${inspection.vessel.name||'—'}`,W-MR,8,{align:'right'});
+    y=22;
+  };
+  // Portada
+  doc.setFillColor(...RED);doc.rect(0,0,W,22,'F');
+  if(logoBase64){try{doc.addImage(logoBase64,'JPEG',ML,2,16,16);}catch(e){}}
+  sf('bold',16,WHITE);doc.text('TECHNICAL MARITIME BUREAU SL',ML+20,10);
+  sf('normal',7,[255,200,200]);doc.text('Las Palmas de Gran Canaria  ·  info@technicalmb.net',ML+20,16);
+  sf('bold',15,WHITE);doc.text('SHIP INSPECTION REPORT',W-MR,10,{align:'right'});
+  sf('normal',8,[255,200,200]);
+  const v=inspection.vessel;
+  const ds=v.date?new Date(v.date+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'}):'—';
+  doc.text(ds,W-MR,17,{align:'right'});
+  doc.setFillColor(...NAVY);doc.rect(0,22,W,2,'F');y=30;
+  // Datos buque
+  doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
+  sf('bold',10,WHITE);doc.text('VESSEL INFORMATION',ML+4,y+5.5);y+=10;
+  const rows=[['Vessel Name',v.name||'—','Port of Inspection',v.port||'—'],['Flag',v.flag||'—','IMO / Official No.',v.imo||'—'],['Vessel Type',v.type||'—','Date of Inspection',ds],['Inspector',v.inspector||'—','Job Reference',v.jobRef||'—']];
+  const cW=(W-ML-MR)/4;
+  rows.forEach((r,i)=>{
+    doc.setFillColor(...(i%2===0?LIGHT:WHITE));doc.rect(ML,y,W-ML-MR,7,'F');
+    sf('bold',7.5,STEEL);doc.text(r[0],ML+2,y+2.5);sf('bold',9,NAVY);doc.text(r[1],ML+2,y+6);
+    sf('bold',7.5,STEEL);doc.text(r[2],ML+cW*2+2,y+2.5);sf('bold',9,NAVY);doc.text(r[3],ML+cW*2+2,y+6);y+=7;
+  });y+=6;
+  // Resumen
+  npi(30);doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
+  sf('bold',10,WHITE);doc.text('INSPECTION CHECKLIST RESULTS',ML+4,y+5.5);y+=10;
+  let tY=0,tN=0,tA=0,tT=0;
+  Object.values(inspection.checklist).forEach(v=>{tT++;if(v==='yes')tY++;else if(v==='no')tN++;else if(v==='na')tA++;});
+  const stats=[{l:'SATISFACTORY',v:tY,c:GREEN},{l:'DEFICIENCY',v:tN,c:RED},{l:'NOT APPLICABLE',v:tA,c:STEEL},{l:'TOTAL ITEMS',v:tT,c:NAVY}];
+  const sW=(W-ML-MR)/4;
+  stats.forEach((s,i)=>{const x=ML+i*sW;doc.setFillColor(...LIGHT);doc.rect(x,y,sW-1,14,'F');sf('bold',18,s.c);doc.text(String(s.v),x+sW/2-.5,y+9,{align:'center'});sf('bold',6.5,STEEL);doc.text(s.l,x+sW/2-.5,y+13,{align:'center'});});y+=18;
+  // Checklist por categoría
+  CHECKLIST_DATA.forEach(cat=>{
+    const ci=cat.items.filter(item=>inspection.checklist[item.id]);if(!ci.length)return;
+    npi(12);doc.setFillColor(...NAVYM);doc.rect(ML,y,W-ML-MR,7,'F');sf('bold',9,WHITE);doc.text(cat.title,ML+3,y+5);y+=7;
+    ci.forEach((item,idx)=>{
+      npi(7);const val=inspection.checklist[item.id];
+      doc.setFillColor(...(idx%2===0?LIGHT:WHITE));doc.rect(ML,y,W-ML-MR-24,6.5,'F');
+      let sc=STEEL,st='N/A';if(val==='yes'){sc=GREEN;st='SAT ✓';}if(val==='no'){sc=RED;st='DEF ✗';}
+      doc.setFillColor(...sc);doc.rect(W-MR-22,y,22,6.5,'F');
+      sf('normal',8,NAVYM);doc.text(doc.splitTextToSize(item.en,W-ML-MR-32)[0],ML+2,y+4.5);
+      sf('bold',8,WHITE);doc.text(st,W-MR-11,y+4.5,{align:'center'});y+=6.5;
+    });y+=3;
+  });
+  // Deficiencias
+  const defs=[];CHECKLIST_DATA.forEach(cat=>cat.items.forEach(item=>{if(inspection.checklist[item.id]==='no')defs.push({cat:cat.title,text:item.en});}));
+  if(defs.length){
+    npi(20);y+=4;doc.setFillColor(...RED);doc.rect(ML,y,W-ML-MR,8,'F');
+    sf('bold',10,WHITE);doc.text(`⚠  DEFICIENCIES REQUIRING ATTENTION  (${defs.length})`,ML+4,y+5.5);y+=10;
+    defs.forEach((d,i)=>{
+      npi(8);doc.setFillColor(...(i%2===0?[255,235,238]:WHITE));doc.rect(ML,y,W-ML-MR,8,'F');
+      doc.setFillColor(...RED);doc.rect(ML,y,3,8,'F');
+      sf('bold',7.5,STEEL);doc.text((d.cat.split('/')[1]?.trim()||d.cat).toUpperCase(),ML+6,y+3);
+      sf('normal',8.5,NAVY);doc.text(doc.splitTextToSize(d.text,W-ML-MR-10)[0],ML+6,y+6.5);y+=8;
+    });y+=4;
+  }
+  // Fotos
+  if(inspection.photos&&inspection.photos.length){
+    npi(20);y+=2;doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
+    sf('bold',10,WHITE);doc.text(`PHOTOGRAPHIC EVIDENCE  (${inspection.photos.length} photos)`,ML+4,y+5.5);y+=12;
+    const pW=(W-ML-MR-6)/2,pH=46;let col=0;
+    for(const photo of inspection.photos){
+      if(col===0)npi(pH+10);const xP=ML+col*(pW+6);
+      try{doc.addImage(photo.dataUrl,'JPEG',xP,y,pW,pH,undefined,'MEDIUM');}catch(e){doc.setFillColor(...LIGHT);doc.rect(xP,y,pW,pH,'F');}
+      sf('normal',7.5,NAVYM);doc.text(doc.splitTextToSize(photo.caption||`Photo ${inspection.photos.indexOf(photo)+1}`,pW)[0],xP,y+pH+4);
+      col++;if(col===2){col=0;y+=pH+10;}
+    }
+    if(col!==0)y+=pH+10;y+=4;
+  }
+  // Materiales
+  if(inspection.materials&&inspection.materials.length){
+    npi(20);y+=2;doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
+    sf('bold',10,WHITE);doc.text(`MATERIALS & RESOURCES REQUIRED  (${inspection.materials.length} items)`,ML+4,y+5.5);y+=10;
+    doc.setFillColor(...NAVYM);doc.rect(ML,y,W-ML-MR,7,'F');
+    sf('bold',8,WHITE);doc.text('#',ML+3,y+5);doc.text('Description / Material',ML+12,y+5);doc.text('Qty',W-MR-33,y+5,{align:'right'});doc.text('Unit',W-MR-8,y+5,{align:'right'});y+=7;
+    inspection.materials.forEach((m,i)=>{
+      npi(7);doc.setFillColor(...(i%2===0?LIGHT:WHITE));doc.rect(ML,y,W-ML-MR,7,'F');
+      sf('normal',8,NAVYM);doc.text(String(i+1),ML+3,y+4.8);doc.text(doc.splitTextToSize(m.description||'—',W-ML-MR-55)[0],ML+12,y+4.8);
+      sf('bold',8,NAVY);doc.text(String(m.quantity||'—'),W-MR-33,y+4.8,{align:'right'});sf('normal',8,NAVYM);doc.text(m.unit||'—',W-MR-8,y+4.8,{align:'right'});y+=7;
+    });y+=4;
+  }
+  // Notas
+  if(inspection.notes&&inspection.notes.trim()){
+    npi(20);y+=2;doc.setFillColor(...NAVY);doc.rect(ML,y,W-ML-MR,8,'F');
+    sf('bold',10,WHITE);doc.text("INSPECTOR'S NOTES & OBSERVATIONS",ML+4,y+5.5);y+=10;
+    const nl=doc.splitTextToSize(inspection.notes,W-ML-MR-8),nH=Math.max(20,nl.length*5+8);
+    doc.setFillColor(...LIGHT);doc.rect(ML,y,W-ML-MR,nH,'F');doc.setFillColor(...RED);doc.rect(ML,y,3,nH,'F');
+    sf('normal',9,NAVYM);doc.text(nl,ML+7,y+6);y+=nH+6;
+  }
+  // Firma
+  npi(35);y+=4;
+  doc.setFillColor(...LIGHT);doc.rect(ML,y,W-ML-MR,28,'F');doc.setFillColor(...NAVY);doc.rect(ML,y,3,28,'F');
+  sf('bold',9,NAVY);doc.text("INSPECTOR'S DECLARATION",ML+7,y+6);
+  sf('normal',8,NAVYM);doc.text('I hereby certify that this inspection was carried out in accordance with TMB procedures and that',ML+7,y+11);
+  doc.text('the information contained herein is accurate and complete to the best of my knowledge.',ML+7,y+15.5);
+  sf('bold',8,NAVY);doc.text('Inspector:',ML+7,y+22);sf('normal',8,NAVYM);doc.text(v.inspector||'—',ML+28,y+22);
+  doc.setFillColor(...NAVY);doc.rect(W-MR-60,y+17,60,.5,'F');sf('normal',7,STEEL);doc.text('Signature',W-MR-30,y+22,{align:'center'});
+  // Pie en todas las páginas
+  const total=doc.internal.getNumberOfPages();for(let i=1;i<=total;i++){doc.setPage(i);addFtr();}
+  return doc;
+}
+// TMB Inspect — Main App Logic
+
+// ── STATE ─────────────────────────────────────────────────────
+let currentScreen = 0;
+let currentInspection = null;
+let savedInspections = [];
+const STORAGE_KEY = 'tmb_inspections';
+
+// ── INIT ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadSavedInspections();
+  buildChecklistUI();
+  renderHomeScreen();
+  showScreen(0);
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  // Wire up events
+  document.getElementById('btn-new').addEventListener('click', startNewInspection);
+  document.getElementById('photo-input').addEventListener('change', handlePhotoAdd);
+  document.getElementById('btn-add-photo').addEventListener('click', () => {
+    document.getElementById('photo-input').click();
+  });
+  document.getElementById('btn-add-material').addEventListener('click', addMaterialRow);
+  document.getElementById('btn-generate-pdf').addEventListener('click', handleGeneratePDF);
+  document.getElementById('btn-share').addEventListener('click', handleShare);
+
+  // Step pills click
+  document.querySelectorAll('.step-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const step = parseInt(pill.dataset.step);
+      if (currentInspection && step > 0) navigateTo(step);
+    });
+  });
+
+  // Nav buttons
+  document.getElementById('btn-prev-vessel').addEventListener('click', () => navigateTo(0));
+  document.getElementById('btn-next-vessel').addEventListener('click', () => {
+    if (validateVesselForm()) { saveVesselForm(); navigateTo(2); }
+  });
+  document.getElementById('btn-prev-check').addEventListener('click', () => navigateTo(1));
+  document.getElementById('btn-next-check').addEventListener('click', () => navigateTo(3));
+  document.getElementById('btn-prev-photos').addEventListener('click', () => navigateTo(2));
+  document.getElementById('btn-next-photos').addEventListener('click', () => navigateTo(4));
+  document.getElementById('btn-prev-materials').addEventListener('click', () => navigateTo(3));
+  document.getElementById('btn-next-materials').addEventListener('click', () => { saveMaterials(); navigateTo(5); });
+  document.getElementById('btn-prev-report').addEventListener('click', () => navigateTo(4));
+});
+
+// ── STORAGE ───────────────────────────────────────────────────
+function loadSavedInspections() {
+  try {
+    savedInspections = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch { savedInspections = []; }
+}
+
+function saveInspection() {
+  if (!currentInspection) return;
+  const idx = savedInspections.findIndex(i => i.id === currentInspection.id);
+  if (idx >= 0) savedInspections[idx] = currentInspection;
+  else savedInspections.unshift(currentInspection);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedInspections));
+}
+
+function deleteInspection(id) {
+  savedInspections = savedInspections.filter(i => i.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedInspections));
+  renderHomeScreen();
+  showToast('Inspección eliminada');
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function showScreen(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${n}`).classList.add('active');
+  currentScreen = n;
+  updateStepPills();
+  updateVesselLabel();
+  window.scrollTo(0, 0);
+
+  if (n === 5) renderReportPreview();
+}
+
+function navigateTo(n) {
+  if (n === 2) renderChecklist();
+  if (n === 3) renderPhotoGrid();
+  if (n === 4) renderMaterialsForm();
+  showScreen(n);
+  saveInspection();
+}
+
+function updateStepPills() {
+  document.querySelectorAll('.step-pill').forEach(pill => {
+    const step = parseInt(pill.dataset.step);
+    pill.classList.remove('active', 'done');
+    if (!currentInspection) return;
+    if (step === currentScreen) pill.classList.add('active');
+    else if (step < currentScreen) pill.classList.add('done');
+  });
+}
+
+function updateVesselLabel() {
+  const el = document.getElementById('vessel-label');
+  if (!currentInspection || !currentInspection.vessel.name) {
+    el.innerHTML = '<span>Sin buque</span>';
+  } else {
+    el.innerHTML = `<strong>${currentInspection.vessel.name}</strong>${currentInspection.vessel.port ? currentInspection.vessel.port : ''}`;
+  }
+}
+
+// ── HOME SCREEN ───────────────────────────────────────────────
+function renderHomeScreen() {
+  const list = document.getElementById('saved-list');
+  if (savedInspections.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="es-icon">📋</div><p>No hay inspecciones guardadas</p></div>';
+    return;
+  }
+  list.innerHTML = savedInspections.map(ins => {
+    const date = ins.vessel?.date ? new Date(ins.vessel.date + 'T12:00:00').toLocaleDateString('es-ES') : '—';
+    const noCount = Object.values(ins.checklist || {}).filter(v => v === 'no').length;
+    return `
+      <div class="inspection-card" onclick="loadInspection('${ins.id}')">
+        <div class="ic-info">
+          <div class="ic-name">M/V ${ins.vessel?.name || 'Sin nombre'}</div>
+          <div class="ic-meta">${date} · ${ins.vessel?.port || '—'} ${noCount > 0 ? `· <span style="color:#C8102E;font-weight:600">${noCount} deficiencias</span>` : ''}</div>
+        </div>
+        <button class="ic-delete" onclick="event.stopPropagation();deleteInspection('${ins.id}')">🗑</button>
+        <span class="ic-arrow">›</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function startNewInspection() {
+  currentInspection = {
+    id: Date.now().toString(),
+    vessel: {},
+    checklist: {},
+    photos: [],
+    materials: [],
+    notes: '',
+    createdAt: new Date().toISOString(),
+  };
+  // Set today's date
+  document.getElementById('v-date').value = new Date().toISOString().split('T')[0];
+  clearVesselForm();
+  navigateTo(1);
+}
+
+function loadInspection(id) {
+  currentInspection = savedInspections.find(i => i.id === id);
+  if (!currentInspection) return;
+  fillVesselForm();
+  navigateTo(1);
+}
+
+// ── VESSEL FORM ───────────────────────────────────────────────
+function clearVesselForm() {
+  ['v-name','v-flag','v-imo','v-type','v-port','v-inspector','v-jobref','v-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('v-date').value = new Date().toISOString().split('T')[0];
+}
+
+function fillVesselForm() {
+  const v = currentInspection.vessel;
+  if (v.name)      document.getElementById('v-name').value = v.name;
+  if (v.flag)      document.getElementById('v-flag').value = v.flag;
+  if (v.imo)       document.getElementById('v-imo').value = v.imo;
+  if (v.type)      document.getElementById('v-type').value = v.type;
+  if (v.port)      document.getElementById('v-port').value = v.port;
+  if (v.inspector) document.getElementById('v-inspector').value = v.inspector;
+  if (v.jobRef)    document.getElementById('v-jobref').value = v.jobRef;
+  if (v.date)      document.getElementById('v-date').value = v.date;
+}
+
+function saveVesselForm() {
+  currentInspection.vessel = {
+    name:      document.getElementById('v-name').value.trim(),
+    flag:      document.getElementById('v-flag').value.trim(),
+    imo:       document.getElementById('v-imo').value.trim(),
+    type:      document.getElementById('v-type').value.trim(),
+    port:      document.getElementById('v-port').value.trim(),
+    inspector: document.getElementById('v-inspector').value.trim(),
+    jobRef:    document.getElementById('v-jobref').value.trim(),
+    date:      document.getElementById('v-date').value,
+  };
+}
+
+function validateVesselForm() {
+  const name = document.getElementById('v-name').value.trim();
+  const inspector = document.getElementById('v-inspector').value.trim();
+  if (!name) { showToast('⚠ Introduce el nombre del buque'); document.getElementById('v-name').focus(); return false; }
+  if (!inspector) { showToast('⚠ Introduce el nombre del inspector'); document.getElementById('v-inspector').focus(); return false; }
+  return true;
+}
+
+// ── CHECKLIST ─────────────────────────────────────────────────
+function buildChecklistUI() {
+  const container = document.getElementById('checklist-container');
+  container.innerHTML = CHECKLIST_DATA.map(cat => `
+    <div class="category-block" id="cat-${cat.id}">
+      <div class="category-header" onclick="toggleCategory('${cat.id}')">
+        <div class="cat-left">
+          <span class="cat-icon">${cat.icon}</span>
+          <div>
+            <div class="cat-title">${cat.title}</div>
+            <div class="cat-count" id="count-${cat.id}">0 / ${cat.items.length} completados</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="cat-progress">
+            <div class="cat-progress-bar"><div class="cat-progress-fill" id="prog-${cat.id}" style="width:0%"></div></div>
+          </div>
+          <span class="cat-arrow">▾</span>
+        </div>
+      </div>
+      <div class="category-items" id="items-${cat.id}">
+        ${cat.items.map(item => `
+          <div class="check-item">
+            <div class="check-item-text">${item.text}</div>
+            <div class="check-btns">
+              <button class="check-btn yes" id="btn-yes-${item.id}" onclick="setCheck('${cat.id}','${item.id}','yes')">SÍ</button>
+              <button class="check-btn no"  id="btn-no-${item.id}"  onclick="setCheck('${cat.id}','${item.id}','no')">NO</button>
+              <button class="check-btn na"  id="btn-na-${item.id}"  onclick="setCheck('${cat.id}','${item.id}','na')">N/A</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderChecklist() {
+  if (!currentInspection) return;
+  // Restore saved answers
+  CHECKLIST_DATA.forEach(cat => {
+    cat.items.forEach(item => {
+      const val = currentInspection.checklist[item.id];
+      ['yes','no','na'].forEach(v => {
+        const btn = document.getElementById(`btn-${v}-${item.id}`);
+        if (btn) btn.classList.toggle('active', val === v);
+      });
+    });
+    updateCategoryProgress(cat.id);
+  });
+  updateChecklistSummary();
+  // Open first incomplete category
+  const firstIncomplete = CHECKLIST_DATA.find(cat =>
+    cat.items.some(item => !currentInspection.checklist[item.id])
+  );
+  if (firstIncomplete) toggleCategory(firstIncomplete.id, true);
+}
+
+function setCheck(catId, itemId, val) {
+  if (!currentInspection) return;
+  const current = currentInspection.checklist[itemId];
+  // Toggle off if same value clicked
+  if (current === val) {
+    delete currentInspection.checklist[itemId];
+    val = null;
+  } else {
+    currentInspection.checklist[itemId] = val;
+  }
+  ['yes','no','na'].forEach(v => {
+    const btn = document.getElementById(`btn-${v}-${itemId}`);
+    if (btn) btn.classList.toggle('active', val === v);
+  });
+  updateCategoryProgress(catId);
+  updateChecklistSummary();
+}
+
+function toggleCategory(id, forceOpen = false) {
+  const block = document.getElementById(`cat-${id}`);
+  if (!block) return;
+  if (forceOpen) block.classList.add('open');
+  else block.classList.toggle('open');
+}
+
+function updateCategoryProgress(catId) {
+  const cat = CHECKLIST_DATA.find(c => c.id === catId);
+  if (!cat) return;
+  const answered = cat.items.filter(item => currentInspection.checklist[item.id]).length;
+  const pct = Math.round(answered / cat.items.length * 100);
+  const prog = document.getElementById(`prog-${catId}`);
+  const count = document.getElementById(`count-${catId}`);
+  if (prog) prog.style.width = pct + '%';
+  if (count) count.textContent = `${answered} / ${cat.items.length} completados`;
+}
+
+function updateChecklistSummary() {
+  let yes = 0, no = 0, na = 0;
+  Object.values(currentInspection.checklist).forEach(v => {
+    if (v === 'yes') yes++;
+    else if (v === 'no') no++;
+    else if (v === 'na') na++;
+  });
+  document.getElementById('sum-yes').textContent = yes;
+  document.getElementById('sum-no').textContent = no;
+  document.getElementById('sum-na').textContent = na;
+}
+
+// ── PHOTOS ────────────────────────────────────────────────────
+function handlePhotoAdd(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      currentInspection.photos.push({
+        id: Date.now().toString() + Math.random(),
+        dataUrl: ev.target.result,
+        caption: '',
+      });
+      renderPhotoGrid();
+      saveInspection();
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+
+function renderPhotoGrid() {
+  if (!currentInspection) return;
+  const grid = document.getElementById('photo-grid');
+  const photos = currentInspection.photos;
+
+  document.getElementById('photo-count').textContent =
+    photos.length === 0 ? 'Sin fotos' : `${photos.length} foto${photos.length !== 1 ? 's' : ''}`;
+
+  if (photos.length === 0) {
+    grid.innerHTML = '';
+    return;
+  }
+
+  grid.innerHTML = photos.map((p, i) => `
+    <div class="photo-card">
+      <img src="${p.dataUrl}" alt="Photo ${i+1}">
+      <button class="photo-delete" onclick="deletePhoto('${p.id}')">✕</button>
+      <div class="photo-card-footer">
+        <input type="text" placeholder="Descripción..." value="${p.caption || ''}"
+          onchange="updatePhotoCaption('${p.id}', this.value)">
+      </div>
+    </div>
+  `).join('');
+}
+
+function deletePhoto(id) {
+  currentInspection.photos = currentInspection.photos.filter(p => p.id !== id);
+  renderPhotoGrid();
+  saveInspection();
+}
+
+function updatePhotoCaption(id, caption) {
+  const photo = currentInspection.photos.find(p => p.id === id);
+  if (photo) { photo.caption = caption; saveInspection(); }
+}
+
+// ── MATERIALS ─────────────────────────────────────────────────
+const UNITS = ['ud', 'ml', 'l', 'kg', 't', 'm', 'm²', 'm³', 'h', 'set', 'par'];
+
+function renderMaterialsForm() {
+  if (!currentInspection) return;
+  const container = document.getElementById('materials-list');
+  if (currentInspection.materials.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="es-icon">📦</div><p>No hay materiales. Pulsa "Añadir" para agregar.</p></div>';
+    return;
+  }
+  container.innerHTML = currentInspection.materials.map((m, i) => `
+    <div class="material-row" id="mat-row-${m.id}">
+      <input type="text" placeholder="Descripción del material..." value="${m.description || ''}"
+        onchange="updateMaterial('${m.id}','description',this.value)">
+      <input type="number" placeholder="Cant." value="${m.quantity || ''}" min="0"
+        onchange="updateMaterial('${m.id}','quantity',this.value)">
+      <select onchange="updateMaterial('${m.id}','unit',this.value)">
+        ${UNITS.map(u => `<option value="${u}" ${m.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+      </select>
+      <button class="mat-delete" onclick="deleteMaterial('${m.id}')">🗑</button>
+    </div>
+  `).join('');
+}
+
+function addMaterialRow() {
+  if (!currentInspection) return;
+  const mat = { id: Date.now().toString(), description: '', quantity: '', unit: 'ud' };
+  currentInspection.materials.push(mat);
+  renderMaterialsForm();
+  // Focus the new row's description
+  setTimeout(() => {
+    const lastRow = document.querySelector(`#mat-row-${mat.id} input`);
+    if (lastRow) lastRow.focus();
+  }, 50);
+}
+
+function deleteMaterial(id) {
+  currentInspection.materials = currentInspection.materials.filter(m => m.id !== id);
+  renderMaterialsForm();
+}
+
+function updateMaterial(id, field, value) {
+  const mat = currentInspection.materials.find(m => m.id === id);
+  if (mat) mat[field] = value;
+}
+
+function saveMaterials() {
+  // Materials are saved in real-time via updateMaterial, but sync from DOM
+  document.querySelectorAll('.material-row').forEach(row => {
+    const id = row.id.replace('mat-row-', '');
+    const mat = currentInspection.materials.find(m => m.id === id);
+    if (mat) {
+      const inputs = row.querySelectorAll('input, select');
+      if (inputs[0]) mat.description = inputs[0].value;
+      if (inputs[1]) mat.quantity = inputs[1].value;
+      if (inputs[2]) mat.unit = inputs[2].value;
+    }
+  });
+}
+
+// ── REPORT PREVIEW ────────────────────────────────────────────
+function renderReportPreview() {
+  if (!currentInspection) return;
+  let yes = 0, no = 0, na = 0;
+  Object.values(currentInspection.checklist).forEach(v => {
+    if (v === 'yes') yes++;
+    else if (v === 'no') no++;
+    else if (v === 'na') na++;
+  });
+  document.getElementById('rp-yes').textContent = yes;
+  document.getElementById('rp-no').textContent = no;
+  document.getElementById('rp-photos').textContent = currentInspection.photos.length;
+  document.getElementById('rp-materials').textContent = currentInspection.materials.length;
+  document.getElementById('report-notes').value = currentInspection.notes || '';
+}
+
+// ── PDF GENERATION ────────────────────────────────────────────
+async function handleGeneratePDF() {
+  if (!currentInspection) return;
+  currentInspection.notes = document.getElementById('report-notes').value;
+  saveInspection();
+
+  showLoading('Generando informe PDF...');
+  try {
+    const doc = await generatePDF(currentInspection);
+    const fileName = `TMB_Inspect_${(currentInspection.vessel.name || 'vessel').replace(/\s+/g, '_')}_${currentInspection.vessel.date || new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    document.getElementById('btn-share').style.display = 'flex';
+    showToast('✅ PDF generado correctamente');
+    // Store for sharing
+    window._lastPdfDoc = doc;
+    window._lastPdfName = fileName;
+  } catch (err) {
+    console.error(err);
+    showToast('❌ Error al generar el PDF');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function handleShare() {
+  if (!window._lastPdfDoc) return;
+  try {
+    const pdfBlob = window._lastPdfDoc.output('blob');
+    const file = new File([pdfBlob], window._lastPdfName, { type: 'application/pdf' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: `TMB Inspect — ${currentInspection.vessel.name || 'Inspection Report'}` });
+    } else {
+      // Fallback: download again
+      window._lastPdfDoc.save(window._lastPdfName);
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') showToast('Error al compartir');
+  }
+}
+
+// ── UTILITIES ─────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function showLoading(msg = 'Cargando...') {
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+</script>
+
 </body>
 </html>
