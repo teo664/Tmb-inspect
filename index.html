@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#C8102E">
+  <title>TMB Inspect</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- PWA icons for iOS -->
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- jsPDF from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────────────── -->
+<header id="app-header">
+  <div class="header-top">
+    <div class="header-logo">
+      <img src="/icons/logo.jpg" alt="TMB" class="header-logo-img">
+      <div class="logo-text">
+        Inspect
+        <span>Technical Maritime Bureau</span>
+      </div>
+    </div>
+    <div id="vessel-label"><span>Sin buque seleccionado</span></div>
+  </div>
+
+  <div class="progress-wrap">
+    <button class="step-pill" data-step="1">
+      <span class="step-num">1</span> Buque
+    </button>
+    <span class="step-separator">›</span>
+    <button class="step-pill" data-step="2">
+      <span class="step-num">2</span> Checklist
+    </button>
+    <span class="step-separator">›</span>
+    <button class="step-pill" data-step="3">
+      <span class="step-num">3</span> Fotos
+    </button>
+    <span class="step-separator">›</span>
+    <button class="step-pill" data-step="4">
+      <span class="step-num">4</span> Materiales
+    </button>
+    <span class="step-separator">›</span>
+    <button class="step-pill" data-step="5">
+      <span class="step-num">5</span> Informe
+    </button>
+  </div>
+</header>
+
+<!-- ── SCREEN 0: HOME ──────────────────────────────────── -->
+<div class="screen active" id="screen-0">
+  <div class="home-hero">
+    <div class="hero-icon">🚢</div>
+    <h1>Ship Inspection</h1>
+    <p>Aplicación de inspección naval para técnicos de TMB. Checklist, fotos y generación de informe PDF.</p>
+  </div>
+
+  <button class="btn-primary" id="btn-new">
+    ➕ Nueva Inspección
+  </button>
+
+  <div>
+    <div class="section-title">Inspecciones guardadas</div>
+    <div id="saved-list"></div>
+  </div>
+</div>
+
+<!-- ── SCREEN 1: VESSEL INFO ────────────────────────────── -->
+<div class="screen" id="screen-1">
+  <div class="card">
+    <div class="card-title"><span class="card-icon">🚢</span> Datos del Buque</div>
+
+    <div class="form-group">
+      <label>Nombre del Buque *</label>
+      <input type="text" id="v-name" placeholder="M/V Sea Cloud Spirit" autocomplete="off">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Pabellón / Flag</label>
+        <input type="text" id="v-flag" placeholder="Panama">
+      </div>
+      <div class="form-group">
+        <label>IMO / Matrícula</label>
+        <input type="text" id="v-imo" placeholder="IMO 9400398">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Tipo de Buque / Vessel Type</label>
+      <select id="v-type">
+        <option value="">Seleccionar tipo...</option>
+        <option value="General Cargo Vessel">General Cargo Vessel</option>
+        <option value="Bulk Carrier">Bulk Carrier</option>
+        <option value="Container Vessel">Container Vessel</option>
+        <option value="Tanker">Tanker</option>
+        <option value="Chemical Tanker">Chemical Tanker</option>
+        <option value="Cruise Ship">Cruise Ship</option>
+        <option value="Passenger Vessel">Passenger Vessel</option>
+        <option value="Ro-Ro Vessel">Ro-Ro Vessel</option>
+        <option value="Fishing Vessel">Fishing Vessel</option>
+        <option value="Supply Vessel / OSV">Supply Vessel / OSV</option>
+        <option value="Tug Boat">Tug Boat</option>
+        <option value="Dredger">Dredger</option>
+        <option value="Yacht / Motor Vessel">Yacht / Motor Vessel</option>
+        <option value="Sailing Vessel">Sailing Vessel</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Puerto / Port of Inspection</label>
+      <input type="text" id="v-port" placeholder="Las Palmas de Gran Canaria">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha / Date *</label>
+        <input type="date" id="v-date">
+      </div>
+      <div class="form-group">
+        <label>Ref. Trabajo / Job Ref.</label>
+        <input type="text" id="v-jobref" placeholder="TMB-2026-XXX">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Inspector *</label>
+      <input type="text" id="v-inspector" placeholder="Nombre del inspector">
+    </div>
+  </div>
+
+  <div class="nav-row">
+    <button class="btn-nav-prev" id="btn-prev-vessel">‹ Inicio</button>
+    <button class="btn-nav-next" id="btn-next-vessel">Checklist ›</button>
+  </div>
+</div>
+
+<!-- ── SCREEN 2: CHECKLIST ──────────────────────────────── -->
+<div class="screen" id="screen-2">
+
+  <div class="checklist-summary">
+    <div class="summary-stat yes">
+      <div class="stat-val" id="sum-yes">0</div>
+      <div class="stat-label">✓ Conforme</div>
+    </div>
+    <div class="summary-stat no">
+      <div class="stat-val" id="sum-no">0</div>
+      <div class="stat-label">✗ Deficiencia</div>
+    </div>
+    <div class="summary-stat na">
+      <div class="stat-val" id="sum-na">0</div>
+      <div class="stat-label">— N/A</div>
+    </div>
+  </div>
+
+  <div id="checklist-container"></div>
+
+  <div class="nav-row">
+    <button class="btn-nav-prev" id="btn-prev-check">‹ Buque</button>
+    <button class="btn-nav-next" id="btn-next-check">Fotos ›</button>
+  </div>
+</div>
+
+<!-- ── SCREEN 3: PHOTOS ─────────────────────────────────── -->
+<div class="screen" id="screen-3">
+
+  <div class="card" style="padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="card-title" style="margin:0"><span class="card-icon">📷</span> Fotos de Inspección</div>
+      <span id="photo-count" style="font-size:13px;color:#7f8c9a">Sin fotos</span>
+    </div>
+
+    <div class="photo-upload-area" id="btn-add-photo">
+      <div class="upload-icon">📸</div>
+      <p>Tomar foto o subir desde galería</p>
+      <span>JPG, PNG — sin límite de fotos</span>
+    </div>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" multiple>
+  </div>
+
+  <div class="photo-grid" id="photo-grid"></div>
+
+  <div class="nav-row">
+    <button class="btn-nav-prev" id="btn-prev-photos">‹ Checklist</button>
+    <button class="btn-nav-next" id="btn-next-photos">Materiales ›</button>
+  </div>
+</div>
+
+<!-- ── SCREEN 4: MATERIALS ──────────────────────────────── -->
+<div class="screen" id="screen-4">
+
+  <div class="card" style="padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="card-title" style="margin:0"><span class="card-icon">📦</span> Materiales Necesarios</div>
+      <button class="btn-primary" id="btn-add-material" style="width:auto;padding:8px 14px;font-size:14px">+ Añadir</button>
+    </div>
+    <div class="mat-header">
+      <span>Descripción</span>
+      <span>Cant.</span>
+      <span>Unidad</span>
+      <span></span>
+    </div>
+  </div>
+
+  <div id="materials-list"></div>
+
+  <div class="nav-row">
+    <button class="btn-nav-prev" id="btn-prev-materials">‹ Fotos</button>
+    <button class="btn-nav-next" id="btn-next-materials">Informe ›</button>
+  </div>
+</div>
+
+<!-- ── SCREEN 5: REPORT ─────────────────────────────────── -->
+<div class="screen" id="screen-5">
+
+  <div class="report-preview">
+    <h3>📊 Resumen de la Inspección</h3>
+    <div class="report-stat-row">
+      <div class="report-stat green">
+        <div class="rs-val" id="rp-yes">0</div>
+        <div class="rs-label">Conforme</div>
+      </div>
+      <div class="report-stat red">
+        <div class="rs-val" id="rp-no">0</div>
+        <div class="rs-label">Deficiencias</div>
+      </div>
+      <div class="report-stat blue">
+        <div class="rs-val" id="rp-photos">0</div>
+        <div class="rs-label">Fotos</div>
+      </div>
+      <div class="report-stat blue">
+        <div class="rs-val" id="rp-materials">0</div>
+        <div class="rs-label">Materiales</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="card-icon">📝</span> Notas del Inspector</div>
+    <textarea class="notes-area" id="report-notes"
+      placeholder="Observaciones adicionales, condiciones del trabajo, notas para el equipo..."></textarea>
+  </div>
+
+  <button class="btn-generate" id="btn-generate-pdf">
+    📄 Generar Informe PDF
+  </button>
+
+  <button class="btn-share" id="btn-share" style="display:none">
+    ↑ Compartir Informe
+  </button>
+
+  <div class="nav-row">
+    <button class="btn-nav-prev" id="btn-prev-report">‹ Materiales</button>
+    <button class="btn-ghost" onclick="showScreen(0); renderHomeScreen()">🏠 Inicio</button>
+  </div>
+</div>
+
+<!-- ── TOAST ───────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── LOADING ─────────────────────────────────────────── -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loading-msg">Generando PDF...</p>
+</div>
+
+<script src="/js/checklist.js"></script>
+<script src="/js/pdf-gen.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
