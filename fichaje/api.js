@@ -51,6 +51,7 @@ const publicUser = (user) => ({
   username: user.username,
   full_name: user.full_name,
   doc_id: user.doc_id,
+  rank: user.rank,
   role: user.role,
   company_id: user.company_id,
   company_code: user.company_code,
@@ -59,8 +60,8 @@ const publicUser = (user) => ({
 });
 
 const ENTRY_SELECT = `
-  SELECT e.*, u.full_name AS user_name, u.doc_id AS user_doc_id, u.company_id, c.code AS company_code,
-         w.ot_number, w.description AS ot_description, w.client, w.vessel, w.location,
+  SELECT e.*, u.full_name AS user_name, u.doc_id AS user_doc_id, u.rank AS user_rank, u.company_id, c.code AS company_code,
+         w.ot_number, w.description AS ot_description, w.client, w.vessel, w.location, w.imo, w.flag,
          v.full_name AS verified_by_name,
          (SELECT a.is_foreman FROM assignments a WHERE a.user_id = e.user_id AND a.work_order_id = e.work_order_id
            ORDER BY a.id DESC LIMIT 1) AS is_foreman
@@ -258,6 +259,7 @@ const createApi = (db) => {
     return {
       full_name: requireText(body.full_name ?? existing.full_name, 'name_required'),
       doc_id: optionalText(body.doc_id ?? existing.doc_id),
+      rank: optionalText(body.rank ?? existing.rank),
       role,
       company_id: companyId,
       lang,
@@ -271,9 +273,9 @@ const createApi = (db) => {
     const fields = readUserFields(req.body);
     if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) throw new ApiError(409, 'username_taken');
     const result = db.prepare(`
-      INSERT INTO users (username, full_name, doc_id, password_hash, role, company_id, lang, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(username, fields.full_name, fields.doc_id, hashPassword(password), fields.role, fields.company_id, fields.lang, now());
+      INSERT INTO users (username, full_name, doc_id, rank, password_hash, role, company_id, lang, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(username, fields.full_name, fields.doc_id, fields.rank, hashPassword(password), fields.role, fields.company_id, fields.lang, now());
     const id = Number(result.lastInsertRowid);
     audit(req.user.id, 'user.create', { user_id: id, username });
     res.status(201).json(publicUser(getUser(id)));
@@ -287,8 +289,8 @@ const createApi = (db) => {
     if (existing.id === req.user.id && (!active || fields.role !== 'admin')) throw new ApiError(400, 'cannot_demote_self');
 
     transaction(db, () => {
-      db.prepare('UPDATE users SET full_name = ?, doc_id = ?, role = ?, company_id = ?, lang = ?, active = ? WHERE id = ?')
-        .run(fields.full_name, fields.doc_id, fields.role, fields.company_id, fields.lang, active ? 1 : 0, existing.id);
+      db.prepare('UPDATE users SET full_name = ?, doc_id = ?, rank = ?, role = ?, company_id = ?, lang = ?, active = ? WHERE id = ?')
+        .run(fields.full_name, fields.doc_id, fields.rank, fields.role, fields.company_id, fields.lang, active ? 1 : 0, existing.id);
       if (req.body.password) {
         if (String(req.body.password).length < 4) throw new ApiError(400, 'password_too_short');
         db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(String(req.body.password)), existing.id);
@@ -321,6 +323,8 @@ const createApi = (db) => {
       client: optionalText(body.client ?? existing.client),
       vessel: optionalText(body.vessel ?? existing.vessel),
       location: optionalText(body.location ?? existing.location),
+      imo: optionalText(body.imo ?? existing.imo),
+      flag: optionalText(body.flag ?? existing.flag),
       status,
     };
   };
@@ -335,9 +339,9 @@ const createApi = (db) => {
     const fields = readWorkOrderFields(req.body);
     assertOtNumberFree(fields.ot_number);
     const result = db.prepare(`
-      INSERT INTO work_orders (ot_number, description, client, vessel, location, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(fields.ot_number, fields.description, fields.client, fields.vessel, fields.location, fields.status, now());
+      INSERT INTO work_orders (ot_number, description, client, vessel, location, imo, flag, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(fields.ot_number, fields.description, fields.client, fields.vessel, fields.location, fields.imo, fields.flag, fields.status, now());
     const id = Number(result.lastInsertRowid);
     audit(req.user.id, 'work_order.create', { work_order_id: id, ...fields });
     res.status(201).json(getWorkOrder(id));
@@ -348,8 +352,9 @@ const createApi = (db) => {
     const fields = readWorkOrderFields(req.body, existing);
     assertOtNumberFree(fields.ot_number, existing.id);
     transaction(db, () => {
-      db.prepare('UPDATE work_orders SET ot_number = ?, description = ?, client = ?, vessel = ?, location = ?, status = ? WHERE id = ?')
-        .run(fields.ot_number, fields.description, fields.client, fields.vessel, fields.location, fields.status, existing.id);
+      db.prepare(`UPDATE work_orders SET ot_number = ?, description = ?, client = ?, vessel = ?, location = ?, imo = ?, flag = ?, status = ?
+        WHERE id = ?`)
+        .run(fields.ot_number, fields.description, fields.client, fields.vessel, fields.location, fields.imo, fields.flag, fields.status, existing.id);
       if (fields.status === 'closed' && existing.status !== 'closed') {
         const assignments = db.prepare('SELECT * FROM assignments WHERE work_order_id = ? AND removed_at IS NULL').all(existing.id);
         for (const assignment of assignments) removeAssignment(assignment, req.user.id, 'work_order_closed');

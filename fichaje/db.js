@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL UNIQUE COLLATE NOCASE,
   full_name TEXT NOT NULL,
   doc_id TEXT NOT NULL DEFAULT '',
+  rank TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin', 'worker')),
   company_id INTEGER NOT NULL REFERENCES companies(id),
@@ -34,6 +35,8 @@ CREATE TABLE IF NOT EXISTS work_orders (
   client TEXT NOT NULL DEFAULT '',
   vessel TEXT NOT NULL DEFAULT '',
   location TEXT NOT NULL DEFAULT '',
+  imo TEXT NOT NULL DEFAULT '',
+  flag TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
   created_at TEXT NOT NULL
 );
@@ -103,6 +106,9 @@ const verifyPassword = (password, stored) => {
 const MIGRATIONS = [
   ['time_entries', 'place', "TEXT NOT NULL DEFAULT 'board' CHECK (place IN ('board', 'workshop'))"],
   ['assignments', 'is_foreman', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'rank', "TEXT NOT NULL DEFAULT ''"],
+  ['work_orders', 'imo', "TEXT NOT NULL DEFAULT ''"],
+  ['work_orders', 'flag', "TEXT NOT NULL DEFAULT ''"],
 ];
 
 const migrate = (db) => {

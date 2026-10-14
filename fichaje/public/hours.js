@@ -83,4 +83,37 @@ const timesheetRows = (entries, classified) => {
     .sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.user_name.localeCompare(b.user_name));
 };
 
-if (typeof module !== 'undefined') module.exports = { classifyEntries, timesheetRows, HOUR_RULES, HOUR_CATEGORIES, PLACES };
+// Hoja mensual de un operario (formatos de SSPT y UNICREW): una fila por cada día del mes.
+// Cada día tiene la primera entrada, la última salida, el total trabajado redondeado a la hora
+// entera y las OT en las que trabajó. Los días sin fichajes quedan vacíos.
+const monthlyWorkerDays = (entries, monthKey) => {
+  const [year, month] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const byDay = new Map();
+  for (const entry of entries.filter((e) => e.end_at)) {
+    const dayKey = dateKeyOf(new Date(entry.start_at));
+    if (!dayKey.startsWith(monthKey)) continue;
+    if (!byDay.has(dayKey)) byDay.set(dayKey, []);
+    byDay.get(dayKey).push(entry);
+  }
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const dayKey = `${monthKey}-${String(index + 1).padStart(2, '0')}`;
+    const dayEntries = (byDay.get(dayKey) || []).sort((a, b) => a.start_at.localeCompare(b.start_at));
+    if (!dayEntries.length) return { dayKey, day: index + 1, worked: false };
+    const minutes = dayEntries.reduce((sum, e) => sum + Math.round((Date.parse(e.end_at) - Date.parse(e.start_at)) / 60000), 0);
+    const orders = [...new Map(dayEntries.map((e) => [e.work_order_id, e])).values()];
+    return {
+      dayKey,
+      day: index + 1,
+      worked: true,
+      start: dayEntries[0].start_at,
+      stop: dayEntries.reduce((last, e) => (e.end_at > last ? e.end_at : last), dayEntries[0].end_at),
+      hours: Math.round(minutes / 60),
+      orders,
+    };
+  });
+};
+
+if (typeof module !== 'undefined') {
+  module.exports = { classifyEntries, timesheetRows, monthlyWorkerDays, HOUR_RULES, HOUR_CATEGORIES, PLACES };
+}
