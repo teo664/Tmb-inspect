@@ -192,3 +192,74 @@ dialog::backdrop { background: rgba(31, 45, 61, 0.55); }
 
 .place-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 .place-choice .ot-option { text-align: center; font-size: 1.1rem; }
+
+/* ── Primera pantalla ─────────────────── */
+.welcome { max-width: 760px; margin: 0 auto; text-align: center; }
+.welcome h2 { margin: 20px 0 12px; }
+.welcome-logo { width: 110px; border-radius: 12px; margin-top: 8px; }
+.device-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.device-option {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 22px 16px; border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--white); color: var(--navy); font: inherit; cursor: pointer; box-shadow: var(--shadow);
+}
+.device-option:hover, .device-option:focus-visible { border-color: var(--navy); }
+.device-option strong { font-size: 1.3rem; }
+.device-icon { font-size: 2.6rem; line-height: 1; }
+.link-button { background: none; border: none; color: var(--steel); text-decoration: underline; font: inherit; margin-top: 14px; cursor: pointer; width: 100%; }
+
+/* ── Ordenador de fichaje ─────────────── */
+.kiosk-langs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 8px; }
+.kiosk-lang {
+  padding: 16px 8px; font: inherit; font-size: 1.15rem; font-weight: 600; border-radius: var(--radius);
+  border: 2px solid var(--border); background: var(--white); color: var(--navy); cursor: pointer;
+}
+.kiosk-lang.selected { border-color: var(--navy); background: var(--navy); color: var(--white); }
+.kiosk { max-width: 1000px; margin: 0 auto; }
+.kiosk-mode main { max-width: none; }
+.kiosk-clock { text-align: center; margin: 4px 0 16px; }
+.kiosk-clock #kiosk-time { font-size: 4rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kiosk-clock #kiosk-date { font-size: 1.1rem; }
+.kiosk-title { text-align: center; font-size: 2rem; margin: 18px 0 12px; }
+.kiosk-subtitle { text-align: center; font-size: 1.3rem; color: var(--steel); }
+.kiosk-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.kiosk-name {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-height: 84px; padding: 14px 16px; text-align: left; font: inherit; font-size: 1.15rem;
+  border: 2px solid var(--border); border-radius: var(--radius); background: var(--white); color: var(--navy); cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.kiosk-name:active, .key:active, .kiosk-lang:active, .device-option:active { transform: scale(0.97); }
+.kiosk-name .dot { position: absolute; top: 12px; right: 12px; width: 14px; height: 14px; border-radius: 50%; background: var(--green); }
+.kiosk-empty { display: block; padding: 14px; text-align: center; }
+.kiosk-admin-link { display: block; margin: 28px auto 0; background: none; border: none; color: var(--steel); font: inherit; cursor: pointer; }
+.kiosk-cancel { margin-top: 12px; }
+.pin-dots { display: flex; justify-content: center; gap: 18px; margin: 18px 0; }
+.pin-dots span { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--navy); }
+.pin-dots span.filled { background: var(--navy); }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 380px; margin: 0 auto; }
+.key {
+  height: 76px; font: inherit; font-size: 2rem; font-weight: 600; border-radius: var(--radius);
+  border: 2px solid var(--border); background: var(--white); color: var(--navy); cursor: pointer; box-shadow: var(--shadow);
+}
+.kiosk .kiosk-cancel { display: block; max-width: 380px; margin: 16px auto 0; }
+.kiosk .card .kiosk-cancel, .kiosk section + .kiosk-cancel { max-width: none; }
+.kiosk-done { text-align: center; padding: 40px 16px; }
+.kiosk-done.in { border-top: 8px solid var(--green); }
+.kiosk-done.out { border-top: 8px solid var(--red); }
+.kiosk-check { font-size: 5rem; line-height: 1; color: var(--green); }
+.kiosk-done.out .kiosk-check { color: var(--red); }
+.kiosk-done-time { font-size: 3.5rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 8px 0; }
+.kiosk-mode .ot-option strong { font-size: 1.4rem; }
+
+/* ── Mis fichajes (tarjetas) ──────────── */
+.entry-cards { list-style: none; }
+.entry-card { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.entry-card:last-child { border-bottom: none; }
+.entry-card-hours { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.entry-card-hours span:first-child { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .kiosk-langs { grid-template-columns: repeat(2, 1fr); }
+  .kiosk-clock #kiosk-time { font-size: 3rem; }
+}
