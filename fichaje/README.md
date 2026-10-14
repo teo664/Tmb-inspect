@@ -19,23 +19,16 @@ desde la cabecera. Los informes se pueden generar en cualquiera de los cuatro id
 - Consulta sus fichajes de los últimos 31 días y las horas de hoy y de la semana.
 - Puede cambiar su contraseña.
 
-### Primera pantalla: idioma y dispositivo
-Al abrir la aplicación por primera vez en un equipo se elige el **idioma** y el **tipo de
-dispositivo**, y la pantalla se adapta:
-- **Móvil o uso personal**: se entra con usuario y contraseña. Lo usan los operarios en su teléfono
-  y los administradores en su ordenador. El equipo lo recuerda (se puede cambiar desde el login).
-- **Ordenador de fichaje** (pantalla táctil compartida de la empresa): lo configura **un
-  administrador una sola vez** en cada ordenador, con su usuario y contraseña (o desde la pestaña
-  *Terminales*). A partir de ahí ese ordenador abre siempre la pantalla de fichaje:
-  1. Reloj grande, idioma y la **lista de operarios** con OT activa (punto verde = fichado ahora).
-  2. El operario **toca su nombre** y escribe su **PIN de 4 cifras** en el teclado de la pantalla.
-  3. Elige OT y «A bordo / Taller» y pulsa **Fichar entrada** (o **Fichar salida**).
-  4. Confirmación grande y la sesión **se cierra sola** a los 4 segundos. Si nadie toca la
-     pantalla durante 30 segundos, vuelve al inicio.
+### Inicio de sesión: idioma y forma de ver la pantalla
+En la pantalla de inicio de sesión cada operario elige su **idioma**, escribe su usuario y
+contraseña y pulsa cómo quiere ver la aplicación:
+- **📱 Móvil**: en su teléfono. La sesión queda abierta en el teléfono.
+- **🖥️ Pantalla grande**: en los ordenadores táctiles de la empresa. Botones grandes y reloj; la
+  sesión **no se guarda en el ordenador** y **se cierra sola** a los 4 segundos de fichar entrada o
+  salida, o tras 60 segundos sin tocar la pantalla. Así el siguiente operario siempre encuentra la
+  pantalla de inicio de sesión.
 
-  Solo aparecen los operarios con PIN (se asigna en la ficha del operario) y con OT abierta.
-  5 PIN erróneos bloquean a ese operario 15 minutos. Desde *Terminales* se puede desactivar un
-  ordenador; desde el propio ordenador, «⚙ Administración» permite quitar el modo terminal.
+El idioma elegido al entrar se guarda en la ficha del operario.
 
 ### Administrador TMB
 - **Operarios**: alta de usuarios (nombre, DNI/NIE/pasaporte, categoría, empresa SSPT/UNICREW,
