@@ -36,6 +36,8 @@ const fmtHours = (minutes) => (minutes == null ? '—' : (minutes / 60).toLocale
 const fmtClock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`; };
 const sumMinutes = (entries) => entries.reduce((total, e) => total + (e.minutes ?? Math.round((Date.now() - Date.parse(e.start_at)) / 60000)), 0);
 
+const placeLabel = (place) => tr(place === 'workshop' ? 'place_workshop' : 'place_board');
+
 const statusBadge = (entry) => {
   if (!entry.end_at) return `<span class="badge badge-green">${tr('in_progress')}</span>`;
   return entry.status === 'verified'
@@ -143,8 +145,10 @@ const renderHeader = () => {
   logout.textContent = tr('logout');
 };
 
-const ADMIN_VIEWS = ['dashboard', 'workers', 'work-orders', 'entries', 'reports', 'audit'];
-const ADMIN_LABELS = { dashboard: 'dashboard', workers: 'workers', 'work-orders': 'work_orders', entries: 'entries', reports: 'reports', audit: 'audit_log' };
+const ADMIN_VIEWS = ['dashboard', 'workers', 'work-orders', 'entries', 'reports', 'holidays', 'audit'];
+const ADMIN_LABELS = {
+  dashboard: 'dashboard', workers: 'workers', 'work-orders': 'work_orders', entries: 'entries', reports: 'reports', holidays: 'holidays', audit: 'audit_log',
+};
 
 const currentRoute = () => {
   const [view = 'dashboard', id] = location.hash.replace(/^#\/?/, '').split('/');
@@ -169,6 +173,7 @@ const render = () => {
     'work-orders': () => (route.id ? renderWorkOrderDetail(route.id) : renderWorkOrders()),
     entries: renderEntries,
     reports: renderReports,
+    holidays: renderHolidays,
     audit: renderAudit,
   };
   return run(views[route.view]);
@@ -225,6 +230,7 @@ const renderWorker = async () => {
       <div class="muted">${tr('working_on')}</div>
       <div class="ot-big">${esc(open.ot_number)}</div>
       <div>${esc(open.ot_description)}</div>
+      <div><span class="badge">${open.place === 'workshop' ? '🔧' : '⚓'} ${placeLabel(open.place)}</span></div>
       <div class="muted">${tr('since')} ${fmtDateTime(open.start_at)}</div>
       <div class="timer" id="timer">${fmtClock(Date.now() - Date.parse(open.start_at))}</div>
       <div class="field"><input id="clock-note" placeholder="${tr('note_optional')}"></div>
@@ -240,6 +246,11 @@ const renderWorker = async () => {
             <strong>${esc(w.ot_number)}</strong>${esc(w.description)}
             ${w.vessel || w.client ? `<div class="muted">${esc([w.vessel, w.client].filter(Boolean).join(' · '))}</div>` : ''}
           </button>`).join('')}</div>
+        <h3 style="margin-top:16px">${tr('choose_place')}</h3>
+        <div class="place-choice">
+          <button type="button" class="ot-option place-option" data-place="board">⚓ <strong>${tr('place_board')}</strong></button>
+          <button type="button" class="ot-option place-option" data-place="workshop">🔧 <strong>${tr('place_workshop')}</strong></button>
+        </div>
         <div class="field" style="margin-top:12px"><input id="clock-note" placeholder="${tr('note_optional')}"></div>
         <button class="btn btn-in btn-huge" id="btn-clock-in" disabled>▶ ${tr('clock_in')}</button>`
         : `<p class="badge badge-amber" style="padding:10px 14px;margin-top:12px">${tr('no_assigned_ots')}</p>`}
@@ -255,9 +266,9 @@ const renderWorker = async () => {
       <div class="spread"><h3>${tr('my_entries')} <span class="muted">· ${tr('last_days')}</span></h3>
         <button class="btn btn-small" id="btn-password">${tr('change_password')}</button></div>
       ${entries.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>${tr('date')}</th><th>${tr('ot')}</th><th>${tr('start')}</th><th>${tr('end')}</th><th class="num">${tr('hours')}</th><th></th></tr></thead>
+        <thead><tr><th>${tr('date')}</th><th>${tr('ot')}</th><th>${tr('place')}</th><th>${tr('start')}</th><th>${tr('end')}</th><th class="num">${tr('hours')}</th><th></th></tr></thead>
         <tbody>${entries.map((e) => `<tr>
-          <td>${fmtDate(e.start_at)}</td><td>${esc(e.ot_number)}</td><td>${fmtTime(e.start_at)}</td><td>${fmtTime(e.end_at)}</td>
+          <td>${fmtDate(e.start_at)}</td><td>${esc(e.ot_number)}</td><td>${placeLabel(e.place)}</td><td>${fmtTime(e.start_at)}</td><td>${fmtTime(e.end_at)}</td>
           <td class="num">${fmtHours(e.minutes)}</td><td>${statusBadge(e)}</td></tr>`).join('')}</tbody>
       </table></div>` : `<p class="muted">${tr('no_entries')}</p>`}
     </section>`;
@@ -277,20 +288,34 @@ const renderWorker = async () => {
   }
 
   let selected = null;
-  $$('.ot-option').forEach((button) => {
+  let place = null;
+  const refreshClockIn = () => { $('#btn-clock-in').disabled = !(selected && place); };
+  $$('.ot-option[data-ot]').forEach((button) => {
     button.onclick = () => {
-      $$('.ot-option').forEach((b) => b.classList.remove('selected'));
+      $$('.ot-option[data-ot]').forEach((b) => b.classList.remove('selected'));
       button.classList.add('selected');
       selected = button;
-      $('#btn-clock-in').disabled = false;
+      refreshClockIn();
     };
   });
+  $$('.place-option').forEach((button) => {
+    button.onclick = () => {
+      $$('.place-option').forEach((b) => b.classList.remove('selected'));
+      button.classList.add('selected');
+      place = button.dataset.place;
+      refreshClockIn();
+    };
+  });
+  // Con una sola OT asignada se preselecciona.
+  const onlyOrder = $$('.ot-option[data-ot]');
+  if (onlyOrder.length === 1) onlyOrder[0].click();
   const clockIn = $('#btn-clock-in');
   if (clockIn) {
     clockIn.onclick = () => {
-      if (!selected || !confirm(tr('confirm_clock_in', { ot: selected.dataset.number }))) return;
+      if (!selected || !place) return;
+      if (!confirm(`${tr('confirm_clock_in', { ot: selected.dataset.number })}\n${placeLabel(place)}`)) return;
       run(async () => {
-        await api('POST', '/my/clock-in', { work_order_id: Number(selected.dataset.ot), note: $('#clock-note').value });
+        await api('POST', '/my/clock-in', { work_order_id: Number(selected.dataset.ot), place, note: $('#clock-note').value });
         render();
       });
     };
@@ -482,10 +507,13 @@ const renderWorkOrderDetail = async (id) => {
       ${order.status === 'open' ? `<form class="row" id="assign-form" style="margin-bottom:12px">
         <select name="user_id" required><option value="">${tr('worker')}…</option>
           ${options(available, '', (u) => `${u.full_name} (${u.company_code})`)}</select>
+        <label class="check" style="flex:0 0 auto"><input type="checkbox" name="is_foreman"> ${tr('foreman')}</label>
         <button class="btn btn-primary" style="flex:0 0 auto">${tr('assign')}</button></form>` : ''}
       ${active.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>${tr('worker')}</th><th>${tr('company')}</th><th>${tr('assigned_since')}</th><th></th></tr></thead>
-        <tbody>${active.map((a) => `<tr><td>${esc(a.user_name)}</td><td>${esc(a.company_code)}</td><td>${fmtDate(a.assigned_at)}</td>
+        <thead><tr><th>${tr('worker')}</th><th>${tr('company')}</th><th>${tr('foreman')}</th><th>${tr('assigned_since')}</th><th></th></tr></thead>
+        <tbody>${active.map((a) => `<tr><td>${esc(a.user_name)}</td><td>${esc(a.company_code)}</td>
+          <td><input type="checkbox" data-foreman="${a.id}" ${a.is_foreman ? 'checked' : ''} aria-label="${tr('foreman')}"></td>
+          <td>${fmtDate(a.assigned_at)}</td>
           <td><button class="btn btn-small btn-danger" data-remove="${a.id}" data-name="${esc(a.user_name)}">${tr('remove_from_ot')}</button></td></tr>`).join('')}</tbody>
       </table></div>` : `<p class="muted">${tr('no_workers_assigned')}</p>`}
       ${past.length ? `<h3 style="margin-top:16px">${tr('history')}</h3><ul class="muted" style="padding-left:18px">
@@ -510,11 +538,18 @@ const renderWorkOrderDetail = async (id) => {
     assignForm.onsubmit = (event) => {
       event.preventDefault();
       run(async () => {
-        await api('POST', '/assignments', { user_id: Number(new FormData(assignForm).get('user_id')), work_order_id: order.id });
+        const data = new FormData(assignForm);
+        await api('POST', '/assignments', { user_id: Number(data.get('user_id')), work_order_id: order.id, is_foreman: data.has('is_foreman') });
         render();
       });
     };
   }
+  $$('[data-foreman]').forEach((box) => {
+    box.onchange = () => run(async () => {
+      await api('PUT', `/assignments/${box.dataset.foreman}`, { is_foreman: box.checked });
+      toast(tr('saved'));
+    });
+  });
   $$('[data-remove]').forEach((button) => {
     button.onclick = () => {
       if (!confirm(tr('confirm_remove', { name: button.dataset.name, ot: order.ot_number }))) return;
@@ -543,6 +578,8 @@ const entryFormHtml = (entry, users, orders) => `
       ${options(users.filter((u) => u.role === 'worker'), '', (u) => `${u.full_name} (${u.company_code})`)}</select></div>`}
   <div class="field"><label>${tr('ot')}</label><select name="work_order_id" required>${entry.id ? '' : '<option value=""></option>'}
     ${options(orders, entry.work_order_id, (o) => `${o.ot_number} — ${o.description}`)}</select></div>
+  <div class="field"><label>${tr('place')}</label><select name="place" required>
+    ${options([{ id: 'board' }, { id: 'workshop' }], entry.place ?? 'board', (p) => placeLabel(p.id))}</select></div>
   <div class="row">
     <div class="field"><label>${tr('start')}</label><input type="datetime-local" name="start_at" required value="${toInputDateTime(entry.start_at)}"></div>
     <div class="field"><label>${tr('end')}</label><input type="datetime-local" name="end_at" ${entry.id && !entry.end_at ? '' : 'required'} value="${toInputDateTime(entry.end_at)}"></div>
@@ -584,12 +621,13 @@ const renderEntries = async () => {
       </div>
       ${entries.length ? `<div class="table-wrap"><table>
         <thead><tr><th><input type="checkbox" id="check-all" aria-label="${tr('all')}"></th><th>${tr('date')}</th><th>${tr('worker')}</th>
-          <th>${tr('company')}</th><th>${tr('ot')}</th><th>${tr('start')}</th><th>${tr('end')}</th><th class="num">${tr('hours')}</th>
+          <th>${tr('company')}</th><th>${tr('ot')}</th><th>${tr('place')}</th><th>${tr('start')}</th><th>${tr('end')}</th><th class="num">${tr('hours')}</th>
           <th>${tr('status')}</th><th></th></tr></thead>
         <tbody>${entries.map((e) => `<tr>
           <td>${e.end_at ? `<input type="checkbox" class="entry-check" value="${e.id}">` : ''}</td>
           <td>${fmtDate(e.start_at)}</td><td>${esc(e.user_name)}</td><td>${esc(e.company_code)}</td>
           <td title="${esc(e.ot_description)}">${esc(e.ot_number)}</td>
+          <td>${placeLabel(e.place)}</td>
           <td>${fmtTime(e.start_at)}</td>
           <td>${e.end_at ? (localDateKey(e.end_at) === localDateKey(e.start_at) ? fmtTime(e.end_at) : fmtDateTime(e.end_at)) : '—'}</td>
           <td class="num">${fmtHours(e.minutes)}</td>
@@ -630,6 +668,7 @@ const renderEntries = async () => {
       work_order_id: Number(data.get('work_order_id')),
       start_at: fromInputDateTime(data.get('start_at')),
       end_at: fromInputDateTime(data.get('end_at')),
+      place: data.get('place'),
       note: data.get('note'),
     });
     render();
@@ -642,6 +681,7 @@ const renderEntries = async () => {
         work_order_id: Number(data.get('work_order_id')),
         start_at: fromInputDateTime(data.get('start_at')),
         end_at: fromInputDateTime(data.get('end_at')),
+        place: data.get('place'),
         note: data.get('note'),
       });
       render();
@@ -678,8 +718,8 @@ const renderReports = async () => {
           ${options(orders, '', (o) => `${o.ot_number} — ${o.description}`)}</select></div>
         <div><label>${tr('company')}</label><select name="company_id"><option value="">${tr('all')}</option>${options(subcontractors, '', (c) => c.code)}</select></div>
         ${periodFields}
-        <div><label>${tr('report_language')}</label>${langSelect}</div>
       </div>
+      <p class="muted" style="margin-top:12px">${tr('timesheet_english')}</p>
       <label class="check" style="margin:12px 0"><input type="checkbox" name="only_verified" checked> ${tr('only_verified')}</label>
       <div class="actions"><button class="btn btn-primary" name="action" value="print">🖨 ${tr('print_pdf')}</button>
         <button class="btn" name="action" value="csv">${tr('export_csv')}</button></div>
@@ -717,13 +757,17 @@ const renderReports = async () => {
 
   wireReport($('#timesheet-form'), async (p) => {
     const order = orders.find((o) => String(o.id) === p.work_order_id);
-    const query = { from: p.from, to: p.to, work_order_id: p.work_order_id, company_id: p.company_id, status: p.only_verified ? 'verified' : '' };
-    const entries = (await api('GET', `/entries?${entryQuery(query)}`)).filter((e) => e.end_at);
-    const pending = p.only_verified
-      ? (await api('GET', `/entries?${entryQuery({ ...query, status: 'pending' })}`)).length
-      : entries.filter((e) => e.status !== 'verified').length;
-    const company = state.companies.find((c) => String(c.id) === p.company_id);
-    return buildTimesheet({ order, company, entries, from: p.from, to: p.to, lang: p.lang, pending, onlyVerified: Boolean(p.only_verified) });
+    // Se clasifican todos los fichajes del periodo (de cualquier OT): el límite de 8 h normales es por operario y día.
+    const [allEntries, holidays] = await Promise.all([
+      api('GET', `/entries?${entryQuery({ from: p.from, to: p.to })}`),
+      api('GET', '/holidays'),
+    ]);
+    const classified = classifyEntries(allEntries, new Set(holidays.map((h) => h.date)));
+    const ofOrder = allEntries.filter((e) => e.end_at && String(e.work_order_id) === p.work_order_id
+      && (!p.company_id || String(e.company_id) === p.company_id));
+    const entries = p.only_verified ? ofOrder.filter((e) => e.status === 'verified') : ofOrder;
+    const pending = ofOrder.filter((e) => e.status !== 'verified').length;
+    return buildTimesheet({ order, entries, classified, from: p.from, to: p.to, pending, onlyVerified: Boolean(p.only_verified) });
   });
 
   wireReport($('#summary-form'), async (p) => {
@@ -732,6 +776,38 @@ const renderReports = async () => {
     const entries = (await api('GET', `/entries?${entryQuery({ ...query, status: 'verified' })}`)).filter((e) => e.end_at);
     const pending = (await api('GET', `/entries?${entryQuery({ ...query, status: 'pending' })}`)).length;
     return buildSummary({ company, entries, from: p.from, to: p.to, lang: p.lang, pending });
+  });
+};
+
+// ── Admin: festivos ─────────────────────────────────────────
+const renderHolidays = async () => {
+  const holidays = await api('GET', '/holidays');
+  $('#view').innerHTML = `
+    <h2>${tr('holidays')}</h2>
+    <p class="muted" style="margin-bottom:12px">${tr('holidays_desc')}</p>
+    <form class="card row" id="holiday-form">
+      <div><label>${tr('date')}</label><input type="date" name="date" required></div>
+      <div><label>${tr('holiday_name')}</label><input name="name"></div>
+      <button class="btn btn-primary" style="flex:0 0 auto">+ ${tr('add_holiday')}</button>
+    </form>
+    <section class="card">
+      ${holidays.length ? `<table><tbody>${holidays.map((h) => `<tr><td>${fmtDateKey(h.date)}</td><td>${esc(h.name)}</td>
+        <td class="num"><button class="btn btn-small btn-danger" data-delete="${esc(h.date)}" aria-label="${tr('delete')}">✕</button></td></tr>`).join('')}
+      </tbody></table>` : `<p class="muted">${tr('no_holidays')}</p>`}
+    </section>`;
+  $('#holiday-form').onsubmit = (event) => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    run(async () => {
+      await api('POST', '/holidays', { date: data.get('date'), name: data.get('name') });
+      render();
+    });
+  };
+  $$('[data-delete]').forEach((button) => {
+    button.onclick = () => run(async () => {
+      await api('DELETE', `/holidays/${encodeURIComponent(button.dataset.delete)}`);
+      render();
+    });
   });
 };
 

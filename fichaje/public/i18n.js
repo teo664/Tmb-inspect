@@ -151,6 +151,19 @@ const T = {
   by_user: ['Usuario', 'User', 'Пользователь', 'Utilizator'],
   detail: ['Detalle', 'Detail', 'Детали', 'Detalii'],
 
+  // Lugar, capataz y festivos
+  place: ['Lugar', 'Place', 'Место работы', 'Loc'],
+  place_board: ['A bordo', 'On board', 'На борту', 'La bord'],
+  place_workshop: ['Taller', 'Workshop', 'Мастерская', 'Atelier'],
+  choose_place: ['¿Dónde trabajas?', 'Where are you working?', 'Где вы работаете?', 'Unde lucrați?'],
+  foreman: ['Capataz', 'Foreman', 'Бригадир', 'Șef de echipă'],
+  holidays: ['Festivos', 'Holidays', 'Праздники', 'Sărbători'],
+  holidays_desc: ['Los sábados, domingos y estos días cuentan como «Holiday» en el time sheet. Las horas entre 22:00 y 06:00 de días laborables cuentan como «Night»; del resto, las 8 primeras del día son «Normal» y las demás «Overtime».', 'Saturdays, Sundays and these days count as "Holiday" in the time sheet. Hours between 22:00 and 06:00 on working days count as "Night"; of the rest, the first 8 of the day are "Normal" and the others "Overtime".', 'Субботы, воскресенья и эти дни считаются «Holiday» в табеле. Часы с 22:00 до 06:00 в рабочие дни — «Night»; из остальных первые 8 часов дня — «Normal», остальные — «Overtime».', 'Sâmbetele, duminicile și aceste zile se consideră „Holiday” în fișa de pontaj. Orele între 22:00 și 06:00 în zilele lucrătoare sunt „Night”; din rest, primele 8 ore ale zilei sunt „Normal”, iar celelalte „Overtime”.'],
+  holiday_name: ['Nombre (opcional)', 'Name (optional)', 'Название (необязательно)', 'Denumire (opțional)'],
+  add_holiday: ['Añadir festivo', 'Add holiday', 'Добавить праздник', 'Adaugă sărbătoare'],
+  no_holidays: ['No hay festivos dados de alta', 'No holidays added', 'Праздники не добавлены', 'Nu există sărbători adăugate'],
+  timesheet_english: ['Formato del cliente, en inglés. Horas redondeadas a la hora entera.', 'Client format, in English. Hours rounded to whole hours.', 'Формат клиента, на английском. Часы округлены до целых.', 'Formatul clientului, în engleză. Ore rotunjite la ora întreagă.'],
+
   // Errores
   err_unauthorized: ['Sesión caducada. Vuelve a entrar.', 'Session expired. Please sign in again.', 'Сессия истекла. Войдите снова.', 'Sesiunea a expirat. Autentificați-vă din nou.'],
   err_invalid_credentials: ['Usuario o contraseña incorrectos', 'Wrong username or password', 'Неверный логин или пароль', 'Utilizator sau parolă greșită'],
@@ -166,6 +179,7 @@ const T = {
   err_end_required: ['Indica la hora de salida', 'Enter the out time', 'Укажите время окончания', 'Indicați ora de ieșire'],
   err_already_assigned: ['El operario ya está asignado a esta OT', 'Worker already assigned to this WO', 'Работник уже назначен на этот наряд', 'Muncitorul este deja alocat'],
   err_cannot_demote_self: ['No puedes quitarte tus propios permisos de administrador', 'You cannot remove your own admin rights', 'Нельзя снять с себя права администратора', 'Nu vă puteți elimina propriile drepturi de administrator'],
+  err_place_required: ['Elige si trabajas a bordo o en taller', 'Choose on board or workshop', 'Выберите: на борту или в мастерской', 'Alegeți la bord sau în atelier'],
   err_network: ['Sin conexión con el servidor', 'No connection to the server', 'Нет связи с сервером', 'Fără conexiune la server'],
   err_generic: ['Error: revisa los datos', 'Error: check the data', 'Ошибка: проверьте данные', 'Eroare: verificați datele'],
 };

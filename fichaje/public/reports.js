@@ -1,5 +1,5 @@
 // TMB Fichaje — documentos imprimibles (time sheet cliente y resumen subcontrata).
-// Formato provisional: se sustituirá por las plantillas oficiales de TMB y de las subcontratas.
+// El time sheet de cliente sigue el formato oficial de TMB; el resumen de subcontrata es provisional.
 
 const reportFormat = (lang) => {
   const loc = LOCALES[lang];
@@ -92,55 +92,87 @@ const signatures = (fmt, leftKey, rightKey) => `
     <div><strong>${fmt.t(rightKey)}</strong><small>${fmt.t('name_signature_date')}</small></div>
   </div>`;
 
-// ── Time sheet para el cliente: horas de una OT en un periodo ──
-const buildTimesheet = ({ order, company, entries, from, to, lang, pending, onlyVerified }) => {
-  const fmt = { ...reportFormat(lang), lang };
-  const sorted = [...entries].sort((a, b) => a.start_at.localeCompare(b.start_at) || a.user_name.localeCompare(b.user_name));
-  const byWorker = groupBy(sorted, (e) => e.user_id);
-  const title = `TIME SHEET · ${order.ot_number}`;
+// ── Time sheet para el cliente (formato oficial TMB, en inglés) ──
+const TIMESHEET_CSS = `
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #555; margin: 0; padding: 24px 40px; }
+  .toolbar { margin-bottom: 16px; }
+  .toolbar button { font-size: 14px; padding: 8px 16px; cursor: pointer; }
+  .logo { height: 112px; display: block; margin-left: 4px; }
+  .heading { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 22px 14px; }
+  .heading h1 { font-size: 22px; margin: 0; color: #555; }
+  .job-title { font-size: 13px; font-weight: 700; margin: 0 0 6px 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { font-weight: 400; color: #555; padding: 3px 4px; text-align: center; }
+  thead tr.groups th { border-top: 1px solid #e3e9f2; }
+  thead tr.groups th.group { border-left: 1px solid #e3e9f2; }
+  thead tr.cols th { border: 1px solid #e3e9f2; border-top: none; }
+  thead tr.cols th.worker, thead tr.cols th.date { border-left: none; border-right: none; }
+  th.worker { width: 34%; }
+  th.total { font-weight: 700; }
+  tbody td { padding: 3px 4px; text-align: center; border-left: 1px solid #fff; }
+  tbody tr.shaded td { background: #e1e9fb; color: #3d5f9f; }
+  tbody td.worker { text-align: left; }
+  tbody td.date { text-align: right; padding-right: 6px; }
+  td.total { font-weight: 700; color: #555 !important; }
+  tbody tr.spacer td { background: #fff !important; height: 8px; padding: 0; }
+  tfoot td { font-weight: 700; text-align: center; padding: 6px 4px; border-top: 1px solid #e3e9f2; border-bottom: 1px solid #e3e9f2; }
+  tfoot td.label { text-align: right; padding-right: 96px; }
+  .warning { background: #fdf3e7; border-left: 4px solid #e67e22; padding: 8px 10px; margin: 0 0 12px 10px; font-size: 12px; }
+  @media print { .toolbar { display: none; } body { padding: 0; } @page { size: A4 landscape; margin: 10mm 12mm; } }
+`;
 
+const timesheetDate = (dayKey) => dayKey.split('-').reverse().join('-');
+const TIMESHEET_CATEGORIES = ['normal', 'overtime', 'holiday', 'night'];
+const TIMESHEET_LABELS = { normal: 'Normal', overtime: 'Overtime', holiday: 'Holiday', night: 'Night' };
+
+const buildTimesheet = ({ order, entries, classified, from, to, pending, onlyVerified }) => {
+  const rows = timesheetRows(entries, classified);
+  const cell = (value) => (value ? String(value) : '');
+  const workerLabel = (row) => `${row.user_name.toUpperCase()}${row.is_foreman ? ' (Foreman)' : ''}`;
+  const totals = Object.fromEntries(PLACES.map((place) => [place, Object.fromEntries(TIMESHEET_CATEGORIES.map((c) => [
+    c, rows.reduce((sum, row) => sum + row.hours[place][c], 0)]))]));
+  const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
+  const title = `JOB N.: ${order.ot_number}`;
   const warning = pending
-    ? `<div class="warning">${fmt.t(onlyVerified ? 'pending_warning' : 'pending_included', { n: pending })}</div>` : '';
+    ? `<div class="warning">${onlyVerified ? `${pending} record(s) pending TMB verification are not included.` : `Includes ${pending} record(s) pending TMB verification.`}</div>` : '';
 
-  const body = `
-    <div class="info">
-      <div><span>${fmt.t('ot_number')}:</span> <strong>${esc(order.ot_number)}</strong></div>
-      <div><span>${fmt.t('period')}:</span> ${periodText(fmt, from, to)}</div>
-      <div><span>${fmt.t('description')}:</span> ${esc(order.description)}</div>
-      <div><span>${fmt.t('client')}:</span> ${esc(order.client)}</div>
-      <div><span>${fmt.t('vessel')}:</span> ${esc(order.vessel)}</div>
-      <div><span>${fmt.t('location')}:</span> ${esc(order.location)}</div>
-      ${company ? `<div><span>${fmt.t('company')}:</span> ${esc(company.name)}</div>` : ''}
-    </div>
-    ${warning}
-    <table>
-      <thead><tr><th>${fmt.t('date')}</th><th>${fmt.t('worker')}</th><th>${fmt.t('company')}</th>
-        <th>${fmt.t('start')}</th><th>${fmt.t('end')}</th><th class="num">${fmt.t('hours')}</th></tr></thead>
-      <tbody>
-        ${sorted.map((e) => `<tr><td>${fmt.weekday(e.start_at)} ${fmt.date(e.start_at)}</td><td>${esc(e.user_name)}</td><td>${esc(e.company_code)}</td>
-          <td>${fmt.time(e.start_at)}</td><td>${fmt.time(e.end_at)}</td><td class="num">${fmt.hours(e.minutes)}</td></tr>`).join('')
-          || `<tr><td colspan="6">${fmt.t('no_entries')}</td></tr>`}
-      </tbody>
-    </table>
-    <h2>${fmt.t('total_hours')} · ${fmt.t('worker')}</h2>
-    <table>
-      <thead><tr><th>${fmt.t('worker')}</th><th>${fmt.t('company')}</th><th class="num">${fmt.t('days_worked')}</th><th class="num">${fmt.t('hours')}</th></tr></thead>
-      <tbody>
-        ${[...byWorker.values()].map((list) => `<tr><td>${esc(list[0].user_name)}</td><td>${esc(list[0].company_code)}</td>
-          <td class="num">${new Set(list.map((e) => localDateKey(e.start_at))).size}</td><td class="num">${fmt.hours(totalMinutes(list))}</td></tr>`).join('')}
-        <tr class="grand"><td colspan="3">${fmt.t('total')}</td><td class="num">${fmt.hours(totalMinutes(sorted))}</td></tr>
-      </tbody>
-    </table>
-    ${signatures(fmt, 'signature_tmb', 'signature_client')}`;
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>${esc(`WO ${order.ot_number} - ${timesheetDate(from)}`)}</title><style>${TIMESHEET_CSS}</style></head>
+<body>
+  <div class="toolbar"><button onclick="window.print()">🖨 Print / PDF</button></div>
+  <img class="logo" src="${location.origin}/logo.jpg" alt="TMB">
+  <div class="heading"><h1>From: ${timesheetDate(from)} To: ${timesheetDate(to)}</h1><h1>${esc(title)}</h1></div>
+  ${warning}
+  <div class="job-title">JOB N.:${esc(order.ot_number)}-${esc(order.description)}</div>
+  <table>
+    <thead>
+      <tr class="groups"><th colspan="2"></th><th class="group" colspan="4">On board</th><th class="group" colspan="4">Workshop</th><th></th></tr>
+      <tr class="cols"><th class="worker">Worker</th><th class="date">Date</th>
+        ${PLACES.map(() => TIMESHEET_CATEGORIES.map((c) => `<th>${TIMESHEET_LABELS[c]}</th>`).join('')).join('')}
+        <th class="total">Total</th></tr>
+    </thead>
+    <tbody>
+      <tr class="spacer"><td colspan="11"></td></tr>
+      ${rows.map((row, index) => `<tr class="${index % 2 ? '' : 'shaded'}"><td class="worker">${esc(workerLabel(row))}</td><td class="date">${timesheetDate(row.dayKey)}</td>
+        ${PLACES.map((place) => TIMESHEET_CATEGORIES.map((c) => `<td>${cell(row.hours[place][c])}</td>`).join('')).join('')}
+        <td class="total">${cell(row.total)}</td></tr>`).join('')}
+    </tbody>
+    <tfoot><tr><td class="label" colspan="2">TOTAL</td>
+      ${PLACES.map((place) => TIMESHEET_CATEGORIES.map((c) => `<td>${cell(totals[place][c])}</td>`).join('')).join('')}
+      <td>${grandTotal}</td></tr></tfoot>
+  </table>
+</body></html>`;
 
   const csv = toCsv([
-    [fmt.t('ot_number'), fmt.t('description'), fmt.t('client'), fmt.t('vessel'), fmt.t('date'), fmt.t('worker'), fmt.t('doc_id'),
-      fmt.t('company'), fmt.t('start'), fmt.t('end'), fmt.t('hours'), fmt.t('status')],
-    ...sorted.map((e) => [order.ot_number, order.description, order.client, order.vessel, fmt.date(e.start_at), e.user_name, e.user_doc_id,
-      e.company_code, fmt.time(e.start_at), fmt.time(e.end_at), fmt.hours(e.minutes), fmt.t(`status_${e.status}`)]),
+    ['JOB N.', 'Description', 'Worker', 'Date',
+      ...PLACES.flatMap((place) => TIMESHEET_CATEGORIES.map((c) => `${place === 'board' ? 'On board' : 'Workshop'} ${TIMESHEET_LABELS[c]}`)), 'Total'],
+    ...rows.map((row) => [order.ot_number, order.description, workerLabel(row), timesheetDate(row.dayKey),
+      ...PLACES.flatMap((place) => TIMESHEET_CATEGORIES.map((c) => row.hours[place][c])), row.total]),
+    ['', '', 'TOTAL', '', ...PLACES.flatMap((place) => TIMESHEET_CATEGORIES.map((c) => totals[place][c])), grandTotal],
   ]);
 
-  return { html: reportShell(fmt, title, body), csv, csvName: `timesheet_${order.ot_number}_${from}_${to}.csv` };
+  return { html, csv, csvName: `WO_${order.ot_number}_${from}_${to}.csv` };
 };
 
 // ── Resumen para la oficina de la subcontrata: horas verificadas por operario ──

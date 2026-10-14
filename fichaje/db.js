@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS assignments (
   assigned_at TEXT NOT NULL,
   assigned_by INTEGER REFERENCES users(id),
   removed_at TEXT,
-  removed_by INTEGER REFERENCES users(id)
+  removed_by INTEGER REFERENCES users(id),
+  is_foreman INTEGER NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_assignment
   ON assignments(user_id, work_order_id) WHERE removed_at IS NULL;
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
   start_at TEXT NOT NULL,
   end_at TEXT,
   source TEXT NOT NULL DEFAULT 'clock' CHECK (source IN ('clock', 'manual')),
+  place TEXT NOT NULL DEFAULT 'board' CHECK (place IN ('board', 'workshop')),
   note TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified')),
   verified_by INTEGER REFERENCES users(id),
@@ -66,6 +68,10 @@ CREATE TABLE IF NOT EXISTS time_entries (
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_entry
   ON time_entries(user_id) WHERE end_at IS NULL;
 CREATE INDEX IF NOT EXISTS entries_by_start ON time_entries(start_at);
+CREATE TABLE IF NOT EXISTS holidays (
+  date TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY,
   user_id INTEGER REFERENCES users(id),
@@ -93,11 +99,25 @@ const verifyPassword = (password, stored) => {
   return crypto.timingSafeEqual(candidate, Buffer.from(hash, 'hex'));
 };
 
+// Columnas añadidas después de la primera versión: se crean en bases de datos ya existentes.
+const MIGRATIONS = [
+  ['time_entries', 'place', "TEXT NOT NULL DEFAULT 'board' CHECK (place IN ('board', 'workshop'))"],
+  ['assignments', 'is_foreman', 'INTEGER NOT NULL DEFAULT 0'],
+];
+
+const migrate = (db) => {
+  for (const [table, column, definition] of MIGRATIONS) {
+    const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+    if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+};
+
 const openDatabase = (file) => {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  migrate(db);
   const insertCompany = db.prepare('INSERT OR IGNORE INTO companies (code, name) VALUES (?, ?)');
   for (const [code, name] of COMPANIES) insertCompany.run(code, name);
   return db;

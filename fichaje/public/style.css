@@ -189,3 +189,6 @@ dialog::backdrop { background: rgba(31, 45, 61, 0.55); }
   .hide-mobile { display: none; }
   .brand span { font-size: 1.05rem; }
 }
+
+.place-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.place-choice .ot-option { text-align: center; font-size: 1.1rem; }
