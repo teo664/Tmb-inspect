@@ -358,7 +358,10 @@ const ensureCompanies = async () => {
 const userFormHtml = (user = {}) => `
   ${user.id ? '' : `<div class="field"><label>${tr('username')}</label><input name="username" required autocapitalize="none"></div>`}
   <div class="field"><label>${tr('full_name')}</label><input name="full_name" required value="${esc(user.full_name)}"></div>
-  <div class="field"><label>${tr('doc_id')}</label><input name="doc_id" value="${esc(user.doc_id)}"></div>
+  <div class="row">
+    <div class="field"><label>${tr('doc_id')}</label><input name="doc_id" value="${esc(user.doc_id)}"></div>
+    <div class="field"><label>${tr('rank')}</label><input name="rank" value="${esc(user.rank)}" placeholder="Welder, Pipefitter…"></div>
+  </div>
   <div class="row">
     <div class="field"><label>${tr('company')}</label><select name="company_id" required>
       ${options(state.companies, user.company_id ?? state.companies.find((c) => c.code !== 'TMB')?.id, (c) => c.code)}</select></div>
@@ -374,6 +377,7 @@ const readUserForm = (data) => ({
   username: data.get('username') ?? undefined,
   full_name: data.get('full_name'),
   doc_id: data.get('doc_id'),
+  rank: data.get('rank'),
   company_id: Number(data.get('company_id')),
   role: data.get('role'),
   lang: data.get('lang'),
@@ -444,6 +448,10 @@ const workOrderFormHtml = (order = {}) => `
   <div class="row">
     <div class="field"><label>${tr('vessel')}</label><input name="vessel" value="${esc(order.vessel)}"></div>
     <div class="field"><label>${tr('location')}</label><input name="location" value="${esc(order.location)}"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>${tr('imo')}</label><input name="imo" value="${esc(order.imo)}"></div>
+    <div class="field"><label>${tr('flag')}</label><input name="flag" value="${esc(order.flag)}"></div>
   </div>`;
 
 const readWorkOrderForm = (data) => ({
@@ -452,6 +460,8 @@ const readWorkOrderForm = (data) => ({
   client: data.get('client'),
   vessel: data.get('vessel'),
   location: data.get('location'),
+  imo: data.get('imo'),
+  flag: data.get('flag'),
 });
 
 const otStatusBadge = (order) => (order.status === 'open'
@@ -499,7 +509,8 @@ const renderWorkOrderDetail = async (id) => {
           <button class="btn ${order.status === 'open' ? 'btn-danger' : ''}" id="btn-toggle-ot">${order.status === 'open' ? tr('close_ot') : tr('reopen_ot')}</button>
         </div></div>
       <p>${esc(order.description)}</p>
-      <p class="muted">${[[tr('client'), order.client], [tr('vessel'), order.vessel], [tr('location'), order.location]]
+      <p class="muted">${[[tr('client'), order.client], [tr('vessel'), order.vessel], [tr('imo'), order.imo], [tr('flag'), order.flag],
+    [tr('location'), order.location]]
     .filter(([, v]) => v).map(([k, v]) => `${k}: ${esc(v)}`).join(' · ')}</p>
     </section>
     <section class="card">
@@ -704,7 +715,6 @@ const renderReports = async () => {
   await ensureCompanies();
   const [orders, users] = await Promise.all([api('GET', '/work-orders'), api('GET', '/users')]);
   const subcontractors = state.companies.filter((c) => c.code !== 'TMB');
-  const langSelect = `<select name="lang">${options(LANGS.map((id) => ({ id })), currentLang, (l) => LANG_NAMES[l.id])}</select>`;
   const periodFields = `
     <div><label>${tr('from')}</label><input type="date" name="from" value="${firstOfMonthKey()}" required></div>
     <div><label>${tr('to')}</label><input type="date" name="to" value="${todayKey()}" required></div>`;
@@ -725,16 +735,15 @@ const renderReports = async () => {
         <button class="btn" name="action" value="csv">${tr('export_csv')}</button></div>
     </form>
     <form class="card" id="summary-form">
-      <h3>🧾 ${tr('summary')}</h3><p class="muted" style="margin-bottom:12px">${tr('summary_desc')}</p>
+      <h3>🧾 ${tr('summary')}</h3><p class="muted" style="margin-bottom:12px">${tr('summary_formats')}</p>
       <div class="row">
         <div><label>${tr('company')}</label><select name="company_id" required><option value="">${tr('choose_company')}</option>
           ${options(subcontractors, '', (c) => `${c.code}`)}</select></div>
         <div><label>${tr('worker')}</label><select name="user_id"><option value="">${tr('all')}</option>
           ${options(users.filter((u) => u.role === 'worker'), '', (u) => `${u.full_name} (${u.company_code})`)}</select></div>
-        ${periodFields}
-        <div><label>${tr('report_language')}</label>${langSelect}</div>
+        <div><label>${tr('month')}</label><input type="month" name="month" value="${todayKey().slice(0, 7)}" required></div>
       </div>
-      <p class="muted" style="margin:12px 0">✓ ${tr('only_verified')}</p>
+      <p style="margin:12px 0"></p>
       <div class="actions"><button class="btn btn-primary" name="action" value="print">🖨 ${tr('print_pdf')}</button>
         <button class="btn" name="action" value="csv">${tr('export_csv')}</button></div>
     </form>`;
@@ -772,10 +781,25 @@ const renderReports = async () => {
 
   wireReport($('#summary-form'), async (p) => {
     const company = state.companies.find((c) => String(c.id) === p.company_id);
-    const query = { from: p.from, to: p.to, company_id: p.company_id, user_id: p.user_id };
-    const entries = (await api('GET', `/entries?${entryQuery({ ...query, status: 'verified' })}`)).filter((e) => e.end_at);
-    const pending = (await api('GET', `/entries?${entryQuery({ ...query, status: 'pending' })}`)).length;
-    return buildSummary({ company, entries, from: p.from, to: p.to, lang: p.lang, pending });
+    const monthKey = p.month;
+    const lastDay = new Date(Number(monthKey.slice(0, 4)), Number(monthKey.slice(5, 7)), 0).getDate();
+    const query = { from: `${monthKey}-01`, to: `${monthKey}-${lastDay}`, company_id: p.company_id, user_id: p.user_id };
+    const [verified, pendingEntries] = await Promise.all([
+      api('GET', `/entries?${entryQuery({ ...query, status: 'verified' })}`),
+      api('GET', `/entries?${entryQuery({ ...query, status: 'pending' })}`),
+    ]);
+    const byWorker = new Map();
+    for (const entry of verified.filter((e) => e.end_at)) {
+      if (!byWorker.has(entry.user_id)) byWorker.set(entry.user_id, []);
+      byWorker.get(entry.user_id).push(entry);
+    }
+    // Un operario elegido expresamente sale aunque no tenga fichajes verificados en el mes.
+    if (p.user_id && !byWorker.has(Number(p.user_id))) byWorker.set(Number(p.user_id), []);
+    const workers = [...byWorker.entries()]
+      .map(([userId, entries]) => ({ worker: users.find((u) => u.id === userId), entries }))
+      .filter(({ worker }) => worker && String(worker.company_id) === p.company_id)
+      .sort((a, b) => a.worker.full_name.localeCompare(b.worker.full_name));
+    return buildSubcontractorSheets({ company, monthKey, workers, pending: pendingEntries.length });
   });
 };
 

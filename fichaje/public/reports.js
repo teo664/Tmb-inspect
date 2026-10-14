@@ -1,28 +1,5 @@
-// TMB Fichaje — documentos imprimibles (time sheet cliente y resumen subcontrata).
-// El time sheet de cliente sigue el formato oficial de TMB; el resumen de subcontrata es provisional.
-
-const reportFormat = (lang) => {
-  const loc = LOCALES[lang];
-  const pad2 = (n) => String(n).padStart(2, '0');
-  return {
-    t: (key, vars) => tr(key, vars, lang),
-    date: (iso) => new Date(iso).toLocaleDateString(loc, { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    weekday: (iso) => new Date(iso).toLocaleDateString(loc, { weekday: 'short' }),
-    time: (iso) => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; },
-    hours: (minutes) => (minutes / 60).toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    now: () => new Date().toLocaleString(loc),
-  };
-};
-
-const groupBy = (items, keyOf) => items.reduce((groups, item) => {
-  const key = keyOf(item);
-  (groups.get(key) || groups.set(key, []).get(key)).push(item);
-  return groups;
-}, new Map());
-
-const totalMinutes = (entries) => entries.reduce((sum, e) => sum + e.minutes, 0);
-
-const periodText = (fmt, from, to) => `${fmt.date(`${from}T00:00`)} – ${fmt.date(`${to}T00:00`)}`;
+// TMB Fichaje — documentos imprimibles.
+// Time sheet de cliente y hojas mensuales de SSPT y UNICREW con sus formatos oficiales.
 
 const csvCell = (value) => {
   const text = String(value ?? '');
@@ -32,7 +9,7 @@ const csvCell = (value) => {
 const toCsv = (rows) => rows.map((row) => row.map(csvCell).join(';')).join('\r\n');
 
 const downloadCsv = (name, csv) => {
-  const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = name;
@@ -40,57 +17,11 @@ const downloadCsv = (name, csv) => {
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 };
 
-const REPORT_CSS = `
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #1F2D3D; margin: 0; padding: 24px; font-size: 11px; }
-  .toolbar { margin-bottom: 16px; }
-  .toolbar button { font-size: 14px; padding: 8px 16px; cursor: pointer; }
-  header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #C8102E; padding-bottom: 10px; margin-bottom: 14px; }
-  header img { height: 56px; }
-  header .title { text-align: right; }
-  header h1 { margin: 0; font-size: 20px; letter-spacing: 0.04em; }
-  .info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 24px; margin-bottom: 14px; }
-  .info div span { color: #6b7a89; display: inline-block; min-width: 110px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-  th { background: #1F2D3D; color: #fff; text-align: left; padding: 5px 6px; font-weight: 600; }
-  td { border-bottom: 1px solid #d5dce4; padding: 4px 6px; }
-  .num { text-align: right; font-variant-numeric: tabular-nums; }
-  tr.subtotal td { font-weight: 700; background: #F4F6F8; }
-  tr.grand td { font-weight: 700; background: #1F2D3D; color: #fff; }
-  h2 { font-size: 13px; margin: 18px 0 6px; }
-  .warning { background: #fdf3e7; border-left: 4px solid #e67e22; padding: 8px 10px; margin-bottom: 14px; }
-  .verified { background: #e8f7f0; border-left: 4px solid #1a9e5c; padding: 8px 10px; margin-bottom: 14px; font-weight: 600; }
-  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 36px; page-break-inside: avoid; }
-  .signatures div { border-top: 1px solid #1F2D3D; padding-top: 6px; min-height: 80px; }
-  .signatures small { color: #6b7a89; display: block; }
-  footer { margin-top: 24px; color: #6b7a89; font-size: 9px; border-top: 1px solid #d5dce4; padding-top: 6px; }
-  .worker-block { page-break-inside: avoid; }
-  @media print { .toolbar { display: none; } body { padding: 0; } @page { margin: 12mm; } }
-`;
-
-const reportShell = (fmt, title, body) => `<!DOCTYPE html>
-<html lang="${fmt.lang}"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${REPORT_CSS}</style></head>
-<body>
-  <div class="toolbar"><button onclick="window.print()">🖨 ${fmt.t('print_pdf')}</button></div>
-  <header>
-    <img src="${location.origin}/logo.jpg" alt="TMB">
-    <div class="title"><h1>${esc(title)}</h1><div>Technical Maritime Bureau SL</div></div>
-  </header>
-  ${body}
-  <footer>${fmt.t('generated_on')} ${fmt.now()} · Technical Maritime Bureau SL · Las Palmas de Gran Canaria · info@technicalmb.net · +34 928 271 172</footer>
-</body></html>`;
-
 const writeReportWindow = (win, html) => {
   win.document.open();
   win.document.write(html);
   win.document.close();
 };
-
-const signatures = (fmt, leftKey, rightKey) => `
-  <div class="signatures">
-    <div><strong>${fmt.t(leftKey)}</strong><small>${fmt.t('name_signature_date')}</small></div>
-    <div><strong>${fmt.t(rightKey)}</strong><small>${fmt.t('name_signature_date')}</small></div>
-  </div>`;
 
 // ── Time sheet para el cliente (formato oficial TMB, en inglés) ──
 const TIMESHEET_CSS = `
@@ -175,54 +106,148 @@ const buildTimesheet = ({ order, entries, classified, from, to, pending, onlyVer
   return { html, csv, csvName: `WO_${order.ot_number}_${from}_${to}.csv` };
 };
 
-// ── Resumen para la oficina de la subcontrata: horas verificadas por operario ──
-const buildSummary = ({ company, entries, from, to, lang, pending }) => {
-  const fmt = { ...reportFormat(lang), lang };
-  const sorted = [...entries].sort((a, b) => a.user_name.localeCompare(b.user_name) || a.start_at.localeCompare(b.start_at));
-  const byWorker = groupBy(sorted, (e) => e.user_id);
-  const title = `${fmt.t('summary').toUpperCase()} · ${company.code}`;
+// ── Hojas mensuales para las oficinas de las subcontratas (formatos oficiales SSPT y UNICREW) ──
+const MONTHS_EN = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const pad2 = (n) => String(n).padStart(2, '0');
+const clockTime = (iso) => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const distinctJoined = (values, separator = ' / ') => [...new Set(values.filter(Boolean))].join(separator);
+const orderText = (order) => `${order.ot_number} - ${order.ot_description}`;
 
-  const workerBlocks = [...byWorker.values()].map((list) => `
-    <div class="worker-block">
-      <h2>${esc(list[0].user_name)}${list[0].user_doc_id ? ` · ${esc(list[0].user_doc_id)}` : ''}</h2>
-      <table>
-        <thead><tr><th>${fmt.t('date')}</th><th>${fmt.t('ot')}</th><th>${fmt.t('description')}</th>
-          <th>${fmt.t('start')}</th><th>${fmt.t('end')}</th><th class="num">${fmt.t('hours')}</th></tr></thead>
-        <tbody>
-          ${list.map((e) => `<tr><td>${fmt.weekday(e.start_at)} ${fmt.date(e.start_at)}</td><td>${esc(e.ot_number)}</td><td>${esc(e.ot_description)}</td>
-            <td>${fmt.time(e.start_at)}</td><td>${fmt.time(e.end_at)}</td><td class="num">${fmt.hours(e.minutes)}</td></tr>`).join('')}
-          <tr class="subtotal"><td colspan="5">${fmt.t('total')} · ${fmt.t('days_worked')}: ${new Set(list.map((e) => localDateKey(e.start_at))).size}</td>
-            <td class="num">${fmt.hours(totalMinutes(list))}</td></tr>
-        </tbody>
-      </table>
-    </div>`).join('');
+const SHEET_BASE_CSS = `
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #f4f6f8; font-family: Calibri, Carlito, Arial, sans-serif; color: #000; }
+  .toolbar { margin-bottom: 16px; font-family: Arial, sans-serif; font-size: 13px; }
+  .toolbar button { font-size: 14px; padding: 8px 16px; cursor: pointer; margin-right: 12px; }
+  .toolbar .warning { display: inline-block; background: #fdf3e7; border-left: 4px solid #e67e22; padding: 8px 10px; }
+  .page { width: 210mm; min-height: 297mm; padding: 12mm 14mm; margin: 0 auto 16px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+  table { width: 100%; border-collapse: collapse; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .toolbar { display: none; }
+    .page { margin: 0; box-shadow: none; page-break-after: always; min-height: auto; }
+    @page { size: A4 portrait; margin: 0; }
+  }
+`;
 
-  const body = `
-    <div class="info">
-      <div><span>${fmt.t('company')}:</span> <strong>${esc(company.name)}</strong></div>
-      <div><span>${fmt.t('period')}:</span> ${periodText(fmt, from, to)}</div>
-    </div>
-    <div class="verified">✓ ${fmt.t('verified_by_tmb')}</div>
-    ${pending ? `<div class="warning">${fmt.t('pending_warning', { n: pending })}</div>` : ''}
-    <h2>${fmt.t('total_hours')}</h2>
-    <table>
-      <thead><tr><th>${fmt.t('worker')}</th><th>${fmt.t('doc_id')}</th><th class="num">${fmt.t('days_worked')}</th><th class="num">${fmt.t('hours')}</th></tr></thead>
-      <tbody>
-        ${[...byWorker.values()].map((list) => `<tr><td>${esc(list[0].user_name)}</td><td>${esc(list[0].user_doc_id)}</td>
-          <td class="num">${new Set(list.map((e) => localDateKey(e.start_at))).size}</td><td class="num">${fmt.hours(totalMinutes(list))}</td></tr>`).join('')
-          || `<tr><td colspan="4">${fmt.t('no_entries')}</td></tr>`}
-        <tr class="grand"><td colspan="3">${fmt.t('total')}</td><td class="num">${fmt.hours(totalMinutes(sorted))}</td></tr>
+const SSPT_CSS = `
+  .logo { height: 34mm; display: block; margin-left: 4mm; }
+  h1 { font-size: 22px; margin: 2mm 0 1mm 3mm; }
+  .sheet { border: 1.5px solid #000; font-size: 13px; }
+  .sheet td { border: 1px solid #000; padding: 1px 4px; }
+  .shaded { background: #d9d9d9; }
+  .info td { border: none; padding: 1px 4px; }
+  .info .label { width: 26%; } .info .colon { width: 3%; } .info .value { font-weight: 700; font-size: 12px; }
+  .notice { text-align: center; font-style: italic; font-weight: 700; font-size: 10px; }
+  .days td { height: 5.4mm; text-align: center; }
+  .days td.desc { text-align: left; }
+  .days .head td { font-weight: 700; }
+  .month { font-size: 15px; }
+  .off { color: #555; }
+  .closing { font-style: italic; font-weight: 700; font-size: 10.5px; text-align: center; margin: 1.5mm 0 3mm; }
+  .signs { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; font-style: italic; font-weight: 700; font-size: 13px; }
+  .signs small { display: block; font-size: 9px; margin-top: 2mm; }
+  .signs .rank { font-weight: 400; margin-left: 6px; }
+`;
+
+const UNICREW_CSS = `
+  body { font-family: Arial, Helvetica, sans-serif; }
+  .title { background: #e8e4e6; border: 1px solid #ccc; text-align: center; font-weight: 700; font-size: 17px; padding: 2mm; margin-top: 14mm; }
+  .fields { margin: 5mm 0 4mm; font-size: 11px; font-weight: 700; width: 92mm; }
+  .fields div { display: flex; align-items: flex-end; gap: 4px; margin-bottom: 3mm; }
+  .fields span.line { flex: 1; border-bottom: 1px solid #000; font-weight: 400; font-size: 13px; padding-left: 4px; min-height: 16px; }
+  .grid { font-size: 12px; }
+  .grid th { background: #e8e4e6; border: 1px solid #000; font-size: 11.5px; padding: 2px 4px; }
+  .grid td { border: 1px solid #000; height: 6.3mm; text-align: center; padding: 0 4px; }
+  .grid td.desc { text-align: left; font-size: 11px; }
+  .grid .c-date { width: 15%; } .grid .c-time { width: 10.5%; } .grid .c-total { width: 16%; }
+  .total { margin: 3mm 0 0 37%; font-weight: 700; font-size: 11px; }
+  .total span { display: block; font-size: 22px; font-weight: 400; margin: 1mm 0 0 8mm; }
+`;
+
+const ssptSheet = ({ worker, days, monthKey, entries }) => {
+  const [year, month] = monthKey.split('-').map(Number);
+  const offCells = '<td class="off">—</td><td class="off">—</td><td class="desc off">— — — — —</td>';
+  return `<section class="page">
+    <img class="logo" src="${location.origin}/logo.jpg" alt="TMB">
+    <h1>TIME SHEET</h1>
+    <table class="sheet">
+      <tr><td class="shaded" colspan="4">Services received by</td></tr>
+      <tr><td colspan="4" style="padding:0"><table class="info">
+        <tr><td class="label">Vessel</td><td class="colon">:</td><td class="value">${esc(distinctJoined(entries.map((e) => e.vessel)))}</td>
+            <td class="label">Flag</td><td class="colon">:</td><td class="value">${esc(distinctJoined(entries.map((e) => e.flag)))}</td></tr>
+        <tr><td class="label">IMO №</td><td class="colon">:</td><td class="value">${esc(distinctJoined(entries.map((e) => e.imo)))}</td>
+            <td class="label">Delivery Address</td><td class="colon">:</td><td class="value">LAS PALMAS, SP</td></tr>
+      </table></td></tr>
+      <tr><td colspan="4" style="padding:0"><table class="info"><tr><td class="label" style="width:20%">Service description</td><td class="colon">:</td>
+        <td class="value">${esc(distinctJoined(entries.map((e) => e.ot_description.toUpperCase()), ' / '))}</td></tr></table></td></tr>
+      <tr><td class="notice" colspan="4">BY SIGNING SUBJECT TIME SHEET CONFIRM RECEIPT OF THE FOLLOWING SERVICES:</td></tr>
+      <tbody class="days">
+        <tr class="head"><td colspan="2" class="month">${MONTHS_EN[month - 1]} ${year}</td><td rowspan="2" style="width:14%">Travel,<br>Days</td>
+          <td rowspan="2" class="shaded">Description</td></tr>
+        <tr class="head"><td style="width:9%">Date</td><td style="width:17%">Hours</td></tr>
+        ${days.map((d) => `<tr><td>${d.day}</td>${d.worked
+          ? `<td>${d.hours}</td><td></td><td class="desc">${esc(d.orders.map(orderText).join('; '))}</td>`
+          : offCells}</tr>`).join('')}
       </tbody>
     </table>
-    ${workerBlocks}
-    ${signatures(fmt, 'signature_tmb', 'signature_company')}`;
+    <div class="closing">All above mentioned services received in good condition. After signing the document the client becomes fully responsible for services he received.</div>
+    <div class="signs">
+      <div>${esc(worker.full_name.toUpperCase())}<span class="rank">${esc(worker.rank)}</span><small>Signature/stamp</small></div>
+      <div>Signed by Master of:<small>Signature/stamp</small></div>
+    </div>
+  </section>`;
+};
+
+const unicrewSheet = ({ worker, days, entries }) => {
+  const total = days.reduce((sum, d) => sum + (d.worked ? d.hours : 0), 0);
+  return `<section class="page">
+    <div class="title">ATTENDANCE TIMESHEET</div>
+    <div class="fields">
+      <div>VESSEL NAME:<span class="line">${esc(distinctJoined(entries.map((e) => e.vessel)))}</span></div>
+      <div>NAME:<span class="line">${esc(worker.full_name.toUpperCase())}</span></div>
+      <div>RANK:<span class="line">${esc(worker.rank.toUpperCase())}</span></div>
+    </div>
+    <table class="grid">
+      <thead><tr><th class="c-date">DATE</th><th class="c-time">WORK<br>STARTED</th><th class="c-time">WORK<br>STOPPED</th>
+        <th class="c-total">TOTAL WORKING<br>HOURS</th><th>JOB DESCRIPTION</th></tr></thead>
+      <tbody>${days.map((d) => {
+        const date = `${pad2(d.day)} ${d.dayKey.slice(5, 7)}`;
+        return d.worked
+          ? `<tr><td>${date}</td><td>${clockTime(d.start)}</td><td>${clockTime(d.stop)}</td><td>${d.hours}</td>
+              <td class="desc">${esc(d.orders.map(orderText).join('; '))}</td></tr>`
+          : `<tr><td>${date}</td><td>—</td><td>—</td><td>—</td><td></td></tr>`;
+      }).join('')}</tbody>
+    </table>
+    <div class="total">TOTAL HOURS:<span>${total}</span></div>
+  </section>`;
+};
+
+const SHEET_TEMPLATES = {
+  SSPT: { css: SSPT_CSS, render: ssptSheet },
+  UNICREW: { css: UNICREW_CSS, render: unicrewSheet },
+};
+
+// workers: [{ worker: { id, full_name, rank, doc_id }, entries }] — solo fichajes verificados por TMB.
+const buildSubcontractorSheets = ({ company, monthKey, workers, pending }) => {
+  const template = SHEET_TEMPLATES[company.code] || SHEET_TEMPLATES.UNICREW;
+  const sheets = workers.map(({ worker, entries }) => ({ worker, entries, days: monthlyWorkerDays(entries, monthKey) }));
+  const warning = pending
+    ? `<span class="warning">⚠ ${pending} fichaje(s) del mes pendientes de verificar por TMB no se incluyen.</span>` : '';
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>${esc(`${company.code} ${monthKey}`)}</title>
+<style>${SHEET_BASE_CSS}${template.css}</style></head>
+<body>
+  <div class="toolbar"><button onclick="window.print()">🖨 Print / PDF</button>${warning}</div>
+  ${sheets.map((sheet) => template.render({ ...sheet, monthKey })).join('') || '<section class="page">No verified records.</section>'}
+</body></html>`;
 
   const csv = toCsv([
-    [fmt.t('company'), fmt.t('worker'), fmt.t('doc_id'), fmt.t('date'), fmt.t('ot_number'), fmt.t('description'),
-      fmt.t('start'), fmt.t('end'), fmt.t('hours')],
-    ...sorted.map((e) => [company.code, e.user_name, e.user_doc_id, fmt.date(e.start_at), e.ot_number, e.ot_description,
-      fmt.time(e.start_at), fmt.time(e.end_at), fmt.hours(e.minutes)]),
+    ['Company', 'Worker', 'Rank', 'ID', 'Date', 'Work started', 'Work stopped', 'Total hours', 'Job description', 'Vessel'],
+    ...sheets.flatMap(({ worker, days }) => days.filter((d) => d.worked).map((d) => [
+      company.code, worker.full_name, worker.rank, worker.doc_id, d.dayKey.split('-').reverse().join('/'),
+      clockTime(d.start), clockTime(d.stop), d.hours, d.orders.map(orderText).join('; '), distinctJoined(d.orders.map((o) => o.vessel)),
+    ])),
   ]);
 
-  return { html: reportShell(fmt, title, body), csv, csvName: `resumen_${company.code}_${from}_${to}.csv` };
+  return { html, csv, csvName: `${company.code}_${monthKey}.csv` };
 };

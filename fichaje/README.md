@@ -20,10 +20,10 @@ desde la cabecera. Los informes se pueden generar en cualquiera de los cuatro id
 - Puede cambiar su contraseña.
 
 ### Administrador TMB
-- **Operarios**: alta de usuarios (nombre, DNI/NIE/pasaporte, empresa SSPT/UNICREW, idioma,
-  contraseña), edición, cambio de contraseña y baja. Al dar de baja a un operario se le retira de
+- **Operarios**: alta de usuarios (nombre, DNI/NIE/pasaporte, categoría, empresa SSPT/UNICREW,
+  idioma, contraseña), edición, cambio de contraseña y baja. Al dar de baja a un operario se le retira de
   todas sus OT y se cierra su fichaje abierto.
-- **Órdenes de trabajo**: alta de OT (nº, descripción, cliente, buque, ubicación), **asignación de
+- **Órdenes de trabajo**: alta de OT (nº, descripción, cliente, buque, IMO, bandera, ubicación), **asignación de
   operarios** (marcando al **capataz** de cada OT) y **retirada** cuando ya no son necesarios. Al retirar a un operario que está fichado
   en esa OT, su fichaje se cierra en ese momento. Al cerrar una OT se retira a todos sus operarios.
   Se conserva el historial de asignaciones.
@@ -40,13 +40,14 @@ desde la cabecera. Los informes se pueden generar en cualquiera de los cuatro id
     - *Normal*: las 8 primeras horas del día; *Overtime*: el resto.
 
     Las reglas están en `public/hours.js` (`HOUR_RULES`).
-  - **Resumen para subcontrata**: horas **verificadas por TMB** por operario y periodo, con detalle
-    diario por OT. Avisa si quedan fichajes pendientes de verificar en el periodo.
+  - **Hojas mensuales para las subcontratas**: una hoja por operario y mes con el formato
+    oficial de cada una — **SSPT** («Time Sheet»: buque, IMO, bandera, horas por día y firmas) y
+    **UNICREW** («Attendance Timesheet»: buque, nombre, categoría, entrada, salida, horas por día y
+    total). Solo incluye fichajes **verificados por TMB** y avisa en pantalla si quedan pendientes.
+    Horas por día redondeadas a la hora entera. Imprimible / PDF y exportable a CSV.
 - **Registro de cambios**: toda acción (fichajes, correcciones, asignaciones, altas y bajas) queda
   registrada con usuario y hora.
 
-> El formato del resumen para subcontratas es provisional (`public/reports.js`) a la espera del
-> formato oficial.
 
 ---
 

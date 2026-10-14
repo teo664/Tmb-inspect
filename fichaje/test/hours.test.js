@@ -52,3 +52,24 @@ test('el capataz se marca en la fila', () => {
   assert.equal(row.is_foreman, true);
   assert.equal(row.total, 5);
 });
+
+const { monthlyWorkerDays } = require('../public/hours');
+
+test('hoja mensual: un día por fila, primera entrada, última salida y total redondeado', () => {
+  const entries = [
+    { id: 1, work_order_id: 7, start_at: at(1, 8), end_at: at(1, 13), ot_number: '2362.1' },
+    { id: 2, work_order_id: 8, start_at: at(1, 14), end_at: at(1, 18, 20), ot_number: '2370.2' },
+    { id: 3, work_order_id: 7, start_at: at(2, 8), end_at: at(2, 18) },
+    { id: 4, work_order_id: 7, start_at: at(31, 8), end_at: null },
+  ];
+  const days = monthlyWorkerDays(entries, '2026-10');
+  assert.equal(days.length, 31);
+  assert.equal(days[0].hours, 9); // 5 h + 4 h 20 min
+  assert.equal(new Date(days[0].start).getHours(), 8);
+  assert.equal(new Date(days[0].stop).getHours(), 18);
+  assert.deepEqual(days[0].orders.map((o) => o.work_order_id), [7, 8]);
+  assert.equal(days[1].hours, 10);
+  assert.equal(days[2].worked, false);
+  assert.equal(days[30].worked, false); // el fichaje abierto no cuenta
+  assert.equal(monthlyWorkerDays([], '2026-09').length, 30);
+});
