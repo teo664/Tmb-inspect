@@ -14,7 +14,8 @@ desde la cabecera. Los informes se pueden generar en cualquiera de los cuatro id
 
 ### Operario (móvil)
 - Ve **solo las OT que tiene asignadas** y abiertas.
-- **Fichar entrada** en una OT y **fichar salida**, con observaciones opcionales y cronómetro.
+- **Fichar entrada** en una OT indicando si trabaja **a bordo o en taller**, y **fichar salida**,
+  con observaciones opcionales y cronómetro. Si cambia de lugar, ficha salida y vuelve a fichar entrada.
 - Consulta sus fichajes de los últimos 31 días y las horas de hoy y de la semana.
 - Puede cambiar su contraseña.
 
@@ -23,22 +24,29 @@ desde la cabecera. Los informes se pueden generar en cualquiera de los cuatro id
   contraseña), edición, cambio de contraseña y baja. Al dar de baja a un operario se le retira de
   todas sus OT y se cierra su fichaje abierto.
 - **Órdenes de trabajo**: alta de OT (nº, descripción, cliente, buque, ubicación), **asignación de
-  operarios** y **retirada** cuando ya no son necesarios. Al retirar a un operario que está fichado
+  operarios** (marcando al **capataz** de cada OT) y **retirada** cuando ya no son necesarios. Al retirar a un operario que está fichado
   en esa OT, su fichaje se cierra en ese momento. Al cerrar una OT se retira a todos sus operarios.
   Se conserva el historial de asignaciones.
 - **Fichajes**: consulta con filtros (fechas, empresa, operario, OT, estado), **verificación** de
   horas por TMB (individual o en bloque), corrección de horas, alta de fichajes manuales y
   eliminación. Corregir horas u OT de un fichaje verificado lo devuelve a «pendiente».
 - **Informes**:
-  - **Time sheet de cliente**: horas de una OT en un periodo, por día y operario, con totales y
-    espacio para la firma de TMB y del cliente. Imprimible / guardable como PDF y exportable a CSV.
+  - **Time sheet de cliente** (formato oficial de TMB, en inglés, A4 apaisado): horas de una OT en
+    un periodo por operario y día, separadas en **On board / Workshop** y en **Normal / Overtime /
+    Holiday / Night**, redondeadas a la hora entera. Imprimible / guardable como PDF y exportable a CSV.
+    Reglas de clasificación (por operario y día, sumando a bordo y taller):
+    - *Holiday*: sábados, domingos y los **festivos** que TMB dé de alta en la pestaña Festivos.
+    - *Night*: horas entre 22:00 y 06:00 en días laborables.
+    - *Normal*: las 8 primeras horas del día; *Overtime*: el resto.
+
+    Las reglas están en `public/hours.js` (`HOUR_RULES`).
   - **Resumen para subcontrata**: horas **verificadas por TMB** por operario y periodo, con detalle
     diario por OT. Avisa si quedan fichajes pendientes de verificar en el periodo.
 - **Registro de cambios**: toda acción (fichajes, correcciones, asignaciones, altas y bajas) queda
   registrada con usuario y hora.
 
-> Los formatos de time sheet y resumen son provisionales (`public/reports.js`) y se sustituirán por
-> los formatos oficiales del cliente y de las subcontratas.
+> El formato del resumen para subcontratas es provisional (`public/reports.js`) a la espera del
+> formato oficial.
 
 ---
 

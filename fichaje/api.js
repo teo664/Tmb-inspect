@@ -4,6 +4,7 @@ const express = require('express');
 const { hashPassword, verifyPassword, transaction } = require('./db');
 
 const LANGS = ['es', 'en', 'ru', 'ro'];
+const PLACES = ['board', 'workshop'];
 const SESSION_DAYS = 30;
 const MAX_LOGIN_FAILURES = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -38,6 +39,11 @@ const parseId = (value, code) => {
   return id;
 };
 
+const parsePlace = (value) => {
+  if (!PLACES.includes(value)) throw new ApiError(400, 'place_required');
+  return value;
+};
+
 const minutesBetween = (start, end) => (end ? Math.round((Date.parse(end) - Date.parse(start)) / 60000) : null);
 
 const publicUser = (user) => ({
@@ -53,9 +59,11 @@ const publicUser = (user) => ({
 });
 
 const ENTRY_SELECT = `
-  SELECT e.*, u.full_name AS user_name, u.doc_id AS user_doc_id, c.code AS company_code,
+  SELECT e.*, u.full_name AS user_name, u.doc_id AS user_doc_id, u.company_id, c.code AS company_code,
          w.ot_number, w.description AS ot_description, w.client, w.vessel, w.location,
-         v.full_name AS verified_by_name
+         v.full_name AS verified_by_name,
+         (SELECT a.is_foreman FROM assignments a WHERE a.user_id = e.user_id AND a.work_order_id = e.work_order_id
+           ORDER BY a.id DESC LIMIT 1) AS is_foreman
   FROM time_entries e
   JOIN users u ON u.id = e.user_id
   JOIN companies c ON c.id = u.company_id
@@ -185,6 +193,7 @@ const createApi = (db) => {
 
   router.post('/my/clock-in', (req, res) => {
     const workOrderId = parseId(req.body.work_order_id, 'work_order_required');
+    const place = parsePlace(req.body.place);
     const entryId = transaction(db, () => {
       const assigned = db.prepare(`
         SELECT 1 FROM assignments a JOIN work_orders w ON w.id = a.work_order_id
@@ -196,9 +205,9 @@ const createApi = (db) => {
       }
       const at = now();
       const result = db.prepare(`
-        INSERT INTO time_entries (user_id, work_order_id, start_at, note, created_at, updated_at, updated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .run(req.user.id, workOrderId, at, optionalText(req.body.note), at, at, req.user.id);
+        INSERT INTO time_entries (user_id, work_order_id, place, start_at, note, created_at, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(req.user.id, workOrderId, place, at, optionalText(req.body.note), at, at, req.user.id);
       audit(req.user.id, 'entry.clock_in', { entry_id: Number(result.lastInsertRowid) });
       return Number(result.lastInsertRowid);
     });
@@ -374,10 +383,20 @@ const createApi = (db) => {
     if (db.prepare('SELECT 1 FROM assignments WHERE user_id = ? AND work_order_id = ? AND removed_at IS NULL').get(userId, workOrderId)) {
       throw new ApiError(409, 'already_assigned');
     }
-    const result = db.prepare('INSERT INTO assignments (user_id, work_order_id, assigned_at, assigned_by) VALUES (?, ?, ?, ?)')
-      .run(userId, workOrderId, now(), req.user.id);
-    audit(req.user.id, 'assignment.create', { assignment_id: Number(result.lastInsertRowid), user_id: userId, work_order_id: workOrderId });
+    const isForeman = req.body.is_foreman ? 1 : 0;
+    const result = db.prepare('INSERT INTO assignments (user_id, work_order_id, assigned_at, assigned_by, is_foreman) VALUES (?, ?, ?, ?, ?)')
+      .run(userId, workOrderId, now(), req.user.id, isForeman);
+    audit(req.user.id, 'assignment.create', { assignment_id: Number(result.lastInsertRowid), user_id: userId, work_order_id: workOrderId, is_foreman: isForeman });
     res.status(201).json({ id: Number(result.lastInsertRowid) });
+  });
+
+  router.put('/assignments/:id', (req, res) => {
+    const assignment = db.prepare('SELECT * FROM assignments WHERE id = ? AND removed_at IS NULL').get(parseId(req.params.id, 'invalid_id'));
+    if (!assignment) throw new ApiError(404, 'assignment_not_found');
+    const isForeman = req.body.is_foreman ? 1 : 0;
+    db.prepare('UPDATE assignments SET is_foreman = ? WHERE id = ?').run(isForeman, assignment.id);
+    audit(req.user.id, 'assignment.update', { assignment_id: assignment.id, is_foreman: isForeman });
+    res.json({ ok: true });
   });
 
   router.delete('/assignments/:id', (req, res) => {
@@ -417,14 +436,15 @@ const createApi = (db) => {
     getWorkOrder(workOrderId);
     const { start, end } = readEntryTimes(req.body);
     if (!end) throw new ApiError(400, 'end_required');
+    const place = parsePlace(req.body.place);
     const id = transaction(db, () => {
       assertNoOverlap(userId, start, end);
       const at = now();
       const result = db.prepare(`
-        INSERT INTO time_entries (user_id, work_order_id, start_at, end_at, source, note, created_at, updated_at, updated_by)
-        VALUES (?, ?, ?, ?, 'manual', ?, ?, ?, ?)`)
-        .run(userId, workOrderId, start, end, optionalText(req.body.note), at, at, req.user.id);
-      audit(req.user.id, 'entry.create', { entry_id: Number(result.lastInsertRowid), user_id: userId, work_order_id: workOrderId, start, end });
+        INSERT INTO time_entries (user_id, work_order_id, place, start_at, end_at, source, note, created_at, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?)`)
+        .run(userId, workOrderId, place, start, end, optionalText(req.body.note), at, at, req.user.id);
+      audit(req.user.id, 'entry.create', { entry_id: Number(result.lastInsertRowid), user_id: userId, work_order_id: workOrderId, place, start, end });
       return Number(result.lastInsertRowid);
     });
     res.status(201).json(getEntry(id));
@@ -437,20 +457,22 @@ const createApi = (db) => {
     const workOrderId = req.body.work_order_id ? parseId(req.body.work_order_id, 'invalid_id') : existing.work_order_id;
     getWorkOrder(workOrderId);
     const note = req.body.note === undefined ? existing.note : optionalText(req.body.note);
-    const changed = start !== existing.start_at || end !== existing.end_at || workOrderId !== existing.work_order_id;
+    const place = req.body.place === undefined ? existing.place : parsePlace(req.body.place);
+    const changed = start !== existing.start_at || end !== existing.end_at || workOrderId !== existing.work_order_id
+      || place !== existing.place;
     transaction(db, () => {
       assertNoOverlap(existing.user_id, start, end, existing.id);
       db.prepare(`
-        UPDATE time_entries SET start_at = ?, end_at = ?, work_order_id = ?, note = ?, updated_at = ?, updated_by = ?,
+        UPDATE time_entries SET start_at = ?, end_at = ?, work_order_id = ?, place = ?, note = ?, updated_at = ?, updated_by = ?,
           status = CASE WHEN ? THEN 'pending' ELSE status END,
           verified_by = CASE WHEN ? THEN NULL ELSE verified_by END,
           verified_at = CASE WHEN ? THEN NULL ELSE verified_at END
         WHERE id = ?`)
-        .run(start, end, workOrderId, note, now(), req.user.id, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0, existing.id);
+        .run(start, end, workOrderId, place, note, now(), req.user.id, changed ? 1 : 0, changed ? 1 : 0, changed ? 1 : 0, existing.id);
       audit(req.user.id, 'entry.update', {
         entry_id: existing.id,
-        before: { start: existing.start_at, end: existing.end_at, work_order_id: existing.work_order_id, note: existing.note },
-        after: { start, end, work_order_id: workOrderId, note },
+        before: { start: existing.start_at, end: existing.end_at, work_order_id: existing.work_order_id, place: existing.place, note: existing.note },
+        after: { start, end, work_order_id: workOrderId, place, note },
       });
     });
     res.json(getEntry(existing.id));
@@ -481,6 +503,23 @@ const createApi = (db) => {
       return count;
     });
     res.json({ updated });
+  });
+
+  router.get('/holidays', (req, res) => res.json(db.prepare('SELECT * FROM holidays ORDER BY date').all()));
+
+  router.post('/holidays', (req, res) => {
+    const date = typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date) ? req.body.date : null;
+    if (!date || Number.isNaN(Date.parse(date))) throw new ApiError(400, 'invalid_date');
+    db.prepare('INSERT INTO holidays (date, name) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET name = excluded.name')
+      .run(date, optionalText(req.body.name));
+    audit(req.user.id, 'holiday.set', { date, name: optionalText(req.body.name) });
+    res.status(201).json({ date });
+  });
+
+  router.delete('/holidays/:date', (req, res) => {
+    db.prepare('DELETE FROM holidays WHERE date = ?').run(req.params.date);
+    audit(req.user.id, 'holiday.delete', { date: req.params.date });
+    res.json({ ok: true });
   });
 
   router.get('/audit', (req, res) => {

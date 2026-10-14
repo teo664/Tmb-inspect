@@ -46,7 +46,7 @@ test('flujo completo: alta, asignación, fichaje, retirada y verificación', asy
   assert.equal(dupOt.status, 409);
 
   const ivan = await login('ivan', '1234');
-  const denied = await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id } });
+  const denied = await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id, place: 'board' } });
   assert.equal(denied.body.error, 'not_assigned');
   assert.equal((await call('GET', '/api/users', { token: ivan })).status, 403);
 
@@ -54,9 +54,12 @@ test('flujo completo: alta, asignación, fichaje, retirada y verificación', asy
   assert.equal(assignment.status, 201);
   assert.equal((await call('GET', '/api/my/work-orders', { token: ivan })).body.length, 1);
 
-  const clockIn = await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id } });
+  const noPlace = await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id } });
+  assert.equal(noPlace.body.error, 'place_required');
+  const clockIn = await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id, place: 'workshop' } });
   assert.equal(clockIn.status, 201);
-  assert.equal((await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id } })).body.error, 'already_clocked_in');
+  assert.equal(clockIn.body.place, 'workshop');
+  assert.equal((await call('POST', '/api/my/clock-in', { token: ivan, body: { work_order_id: ot.body.id, place: 'board' } })).body.error, 'already_clocked_in');
 
   // Retirar al operario cierra su fichaje abierto en esa OT
   assert.equal((await call('DELETE', `/api/assignments/${assignment.body.id}`, { token: admin })).status, 200);
@@ -65,14 +68,14 @@ test('flujo completo: alta, asignación, fichaje, retirada y verificación', asy
 
   const manual = await call('POST', '/api/entries', {
     token: admin,
-    body: { user_id: worker.body.id, work_order_id: ot.body.id, start_at: '2026-10-01T07:00:00Z', end_at: '2026-10-01T15:30:00Z' },
+    body: { user_id: worker.body.id, work_order_id: ot.body.id, start_at: '2026-10-01T07:00:00Z', end_at: '2026-10-01T15:30:00Z', place: 'board' },
   });
   assert.equal(manual.status, 201);
   assert.equal(manual.body.minutes, 510);
 
   const overlap = await call('POST', '/api/entries', {
     token: admin,
-    body: { user_id: worker.body.id, work_order_id: ot.body.id, start_at: '2026-10-01T15:00:00Z', end_at: '2026-10-01T16:00:00Z' },
+    body: { user_id: worker.body.id, work_order_id: ot.body.id, start_at: '2026-10-01T15:00:00Z', end_at: '2026-10-01T16:00:00Z', place: 'board' },
   });
   assert.equal(overlap.body.error, 'entry_overlap');
 
@@ -104,10 +107,33 @@ test('cerrar una OT retira a los operarios asignados', async () => {
   const ot = (await call('POST', '/api/work-orders', { token: admin, body: { ot_number: 'OT-002', description: 'Soldadura' } })).body;
   await call('POST', '/api/assignments', { token: admin, body: { user_id: worker.id, work_order_id: ot.id } });
   const andrei = await login('andrei', '5678');
-  await call('POST', '/api/my/clock-in', { token: andrei, body: { work_order_id: ot.id } });
+  await call('POST', '/api/my/clock-in', { token: andrei, body: { work_order_id: ot.id, place: 'board' } });
 
   await call('PUT', `/api/work-orders/${ot.id}`, { token: admin, body: { status: 'closed' } });
   assert.equal((await call('GET', '/api/my/status', { token: andrei })).body.open, null);
   const active = (await call('GET', `/api/assignments?work_order_id=${ot.id}&active=1`, { token: admin })).body;
   assert.equal(active.length, 0);
+});
+
+test('capataz por OT y festivos', async () => {
+  const admin = await login('admin', 'secret');
+  const sspt = (await call('GET', '/api/companies', { token: admin })).body.find((c) => c.code === 'SSPT');
+  const worker = (await call('POST', '/api/users', {
+    token: admin, body: { username: 'osmel', full_name: 'Urdaneta Viera Osmel', password: '9999', company_id: sspt.id },
+  })).body;
+  const ot = (await call('POST', '/api/work-orders', { token: admin, body: { ot_number: '2362.1', description: 'Margins Plates' } })).body;
+  const assignment = (await call('POST', '/api/assignments', { token: admin, body: { user_id: worker.id, work_order_id: ot.id, is_foreman: true } })).body;
+  const entry = (await call('POST', '/api/entries', {
+    token: admin,
+    body: { user_id: worker.id, work_order_id: ot.id, start_at: '2026-10-09T07:00:00Z', end_at: '2026-10-09T12:00:00Z', place: 'board' },
+  })).body;
+  assert.equal(entry.is_foreman, 1);
+  await call('PUT', `/api/assignments/${assignment.id}`, { token: admin, body: { is_foreman: false } });
+  assert.equal((await call('GET', `/api/entries?work_order_id=${ot.id}`, { token: admin })).body[0].is_foreman, 0);
+
+  assert.equal((await call('POST', '/api/holidays', { token: admin, body: { date: '2026-10-12', name: 'Fiesta Nacional' } })).status, 201);
+  assert.equal((await call('POST', '/api/holidays', { token: admin, body: { date: '12/10/2026' } })).status, 400);
+  assert.deepEqual((await call('GET', '/api/holidays', { token: admin })).body, [{ date: '2026-10-12', name: 'Fiesta Nacional' }]);
+  await call('DELETE', '/api/holidays/2026-10-12', { token: admin });
+  assert.equal((await call('GET', '/api/holidays', { token: admin })).body.length, 0);
 });
