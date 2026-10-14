@@ -1,0 +1,33 @@
+# TMB Fichaje — estado del proyecto
+
+Última actualización: 14-10-2026.
+
+## Hecho (en `main`)
+- **Aplicación base:** alta de operarios (SSPT / UNICREW), órdenes de trabajo, asignación y retirada de operarios, fichaje de entrada y salida con «A bordo / Taller», verificación de horas por TMB, festivos y registro de cambios. En 4 idiomas: ES, EN, RU y RO.
+- **Time sheet de cliente** con el formato oficial de TMB (`WO_2362.1`): On board / Workshop × Normal / Overtime / Holiday / Night, redondeado a horas enteras y con capataz por OT.
+- **Hojas mensuales para las subcontratas** con sus formatos oficiales: SSPT «Time Sheet» y UNICREW «Attendance Timesheet». Solo incluyen fichajes verificados.
+- **Publicación en VPS** con Docker + Caddy (HTTPS): `deploy/instalar.sh`, `actualizar.sh` y `copia.sh`.
+
+## Pendiente
+- **PR #5** (rama `feature/modo-pantalla-grande`): al iniciar sesión el operario elige idioma y «📱 Móvil» o «🖥️ Pantalla grande». La pantalla grande cierra la sesión sola al fichar o tras 60 s sin actividad. Sustituye al terminal con lista de nombres + PIN de la PR #4. **Falta revisarla y fusionarla.**
+- **Instalar en el VPS.** Todavía no se ha hecho y la imagen Docker no se ha probado en real. Ver «Publicar en un VPS» en `README.md`.
+- **Tras instalar:**
+  - Dar de alta los festivos.
+  - Completar la categoría (rank) de cada operario y el IMO y la bandera de cada OT.
+
+## Decisiones tomadas (confirmar si cambian)
+- **Normal / Overtime:** las 8 primeras horas del día son Normal y el resto Overtime.
+- **Holiday:** sábados, domingos y festivos dados de alta. **Night:** de 22:00 a 06:00.
+- **Redondeo:** a la hora entera en el time sheet y en las hojas de las subcontratas.
+- **SSPT:** la columna «Travel, Days» queda vacía y la «Delivery Address» es siempre «LAS PALMAS, SP».
+
+## Trabajar en local (Mac mini)
+```bash
+git clone https://github.com/teo664/Tmb-inspect.git
+cd Tmb-inspect/fichaje
+git checkout feature/modo-pantalla-grande   # o main, si la PR #5 ya está fusionada
+npm install
+ADMIN_PASSWORD='admin123' npm start          # http://localhost:3100
+npm test                                     # 11 tests
+```
+Requiere Node.js 22.13 o superior (`brew install node`).
