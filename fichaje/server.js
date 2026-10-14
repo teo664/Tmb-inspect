@@ -7,8 +7,19 @@ const { createApi } = require('./api');
 
 const createApp = (db) => {
   const app = express();
-  app.set('trust proxy', true);
+  // Solo se confía en la IP que envía un proxy de la red local (Caddy en Docker), no en cualquier cliente.
+  app.set('trust proxy', 'loopback, uniquelocal');
+  app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    res.set({
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'same-origin',
+      'X-Frame-Options': 'DENY',
+    });
+    next();
+  });
   app.use(compression());
+  app.get('/health', (req, res) => res.json({ ok: true }));
   app.use(express.json({ limit: '200kb' }));
   app.use('/api', createApi(db));
   app.use(express.static(path.join(__dirname, 'public')));

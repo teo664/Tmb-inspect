@@ -65,11 +65,60 @@ se genera una contraseña aleatoria y se muestra en la consola.
 | `ADMIN_USER`     | `admin`              | Usuario del primer administrador         |
 | `ADMIN_PASSWORD` | (aleatoria)          | Contraseña del primer administrador      |
 
-**Copias de seguridad**: basta con copiar la carpeta `data/`. El registro de jornada debe
+**Copias de seguridad**: `node backup.js` crea una copia consistente en `data/backups/`. El registro de jornada debe
 conservarse 4 años (art. 34.9 del Estatuto de los Trabajadores).
 
-Para usarla fuera de la red local, publicar con HTTPS (Cloudflare Tunnel o un VPS, igual que
-TMB Inspect).
+---
+
+## Publicar en un VPS (acceso desde cualquier móvil u ordenador)
+
+Así queda accesible desde internet con HTTPS, por ejemplo en `https://fichaje.technicalmb.net`,
+y los operarios pueden fichar desde cualquier móvil, tablet u ordenador con navegador (y
+añadirla a la pantalla de inicio como una app).
+
+Incluye: la aplicación en Docker, **Caddy** con certificado HTTPS gratuito y renovación
+automática, reinicio automático si el servidor se reinicia y **copia de seguridad diaria**.
+
+### 1. Contratar el VPS
+Cualquier VPS con **Ubuntu 24.04** sirve (Hetzner CX22, DigitalOcean, OVH… ~4–6 €/mes; 1–2 GB de
+RAM es suficiente). Apunta la **IP pública**.
+
+### 2. Dominio (recomendado)
+En el panel DNS de `technicalmb.net`, crea un registro **A**: `fichaje` → IP del VPS.
+Si aún no hay dominio, el instalador puede usar `IP-DEL-VPS.sslip.io`, que también tiene HTTPS.
+
+### 3. Instalar
+Conéctate al VPS (`ssh root@IP-DEL-VPS`) y ejecuta:
+
+```bash
+apt-get update && apt-get install -y git
+git clone https://github.com/teo664/Tmb-inspect.git /opt/tmb
+cd /opt/tmb/fichaje/deploy
+sudo ./instalar.sh
+```
+
+El instalador pide el dominio y la contraseña del administrador, instala Docker, arranca la app
+y programa la copia diaria. Al terminar muestra la dirección y las credenciales.
+
+> La app debe estar en la rama `main` (PR fusionada) antes de clonar.
+> Si el repositorio es privado, GitHub pedirá usuario y un *token* personal en el `git clone`.
+
+### Mantenimiento
+
+| Tarea | Comando (en `/opt/tmb/fichaje/deploy`) |
+|---|---|
+| Actualizar a la última versión (hace copia antes) | `sudo ./actualizar.sh` |
+| Copia de seguridad inmediata | `sudo ./copia.sh` |
+| Ver estado | `docker compose ps` |
+| Ver registros | `docker compose logs -f app` |
+| Reiniciar | `docker compose restart` |
+
+- Datos: `deploy/data/fichaje.db`. Copias: `deploy/data/backups/` (se guardan 60 días).
+  **Conviene descargar periódicamente las copias fuera del servidor** (o activar las copias
+  automáticas del proveedor del VPS).
+- Restaurar una copia: `docker compose stop app`, sustituir `data/fichaje.db` por la copia
+  (borrando `fichaje.db-wal` y `fichaje.db-shm` si existen) y `docker compose start app`.
+- La contraseña de `.env` solo se usa en el primer arranque; después se cambia desde la app.
 
 ## Tests
 
