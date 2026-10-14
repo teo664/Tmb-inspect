@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   doc_id TEXT NOT NULL DEFAULT '',
   rank TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
+  pin_hash TEXT,
   role TEXT NOT NULL CHECK (role IN ('admin', 'worker')),
   company_id INTEGER NOT NULL REFERENCES companies(id),
   lang TEXT NOT NULL DEFAULT 'es',
@@ -71,6 +72,15 @@ CREATE TABLE IF NOT EXISTS time_entries (
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_entry
   ON time_entries(user_id) WHERE end_at IS NULL;
 CREATE INDEX IF NOT EXISTS entries_by_start ON time_entries(start_at);
+CREATE TABLE IF NOT EXISTS terminals (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  created_by INTEGER REFERENCES users(id),
+  last_seen_at TEXT
+);
 CREATE TABLE IF NOT EXISTS holidays (
   date TEXT PRIMARY KEY,
   name TEXT NOT NULL DEFAULT ''
@@ -109,6 +119,7 @@ const MIGRATIONS = [
   ['users', 'rank', "TEXT NOT NULL DEFAULT ''"],
   ['work_orders', 'imo', "TEXT NOT NULL DEFAULT ''"],
   ['work_orders', 'flag', "TEXT NOT NULL DEFAULT ''"],
+  ['users', 'pin_hash', 'TEXT'],
 ];
 
 const migrate = (db) => {

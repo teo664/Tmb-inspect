@@ -8,6 +8,11 @@ const PLACES = ['board', 'workshop'];
 const SESSION_DAYS = 30;
 const MAX_LOGIN_FAILURES = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+// En el ordenador de fichaje la sesión del operario es corta: la pantalla la cierra al fichar,
+// y si alguien se va sin terminar, caduca sola.
+const TERMINAL_SESSION_MINUTES = 10;
+const MAX_PIN_FAILURES = 5;
+const PIN_PATTERN = /^\d{4}$/;
 
 class ApiError extends Error {
   constructor(status, code) {
@@ -44,6 +49,8 @@ const parsePlace = (value) => {
   return value;
 };
 
+const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
+
 const minutesBetween = (start, end) => (end ? Math.round((Date.parse(end) - Date.parse(start)) / 60000) : null);
 
 const publicUser = (user) => ({
@@ -52,6 +59,7 @@ const publicUser = (user) => ({
   full_name: user.full_name,
   doc_id: user.doc_id,
   rank: user.rank,
+  has_pin: Boolean(user.pin_hash),
   role: user.role,
   company_id: user.company_id,
   company_code: user.company_code,
@@ -76,6 +84,15 @@ const withMinutes = (entry) => ({ ...entry, minutes: minutesBetween(entry.start_
 const createApi = (db) => {
   const router = express.Router();
   const loginFailures = new Map();
+  const pinFailures = new Map();
+
+  const createSession = (userId, minutes) => {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + minutes * 60000).toISOString();
+    db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now());
+    db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userId, expires);
+    return token;
+  };
 
   const audit = (userId, action, detail = {}) => {
     db.prepare('INSERT INTO audit_log (user_id, action, detail, at) VALUES (?, ?, ?, ?)')
@@ -148,11 +165,46 @@ const createApi = (db) => {
       throw new ApiError(401, 'invalid_credentials');
     }
     loginFailures.delete(key);
-    const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
-    db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now());
-    db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, row.id, expires);
+    const token = createSession(row.id, SESSION_DAYS * 24 * 60);
     res.json({ token, user: publicUser(getUser(row.id)) });
+  });
+
+  // ── Ordenador de fichaje (terminal compartido) ──────────────
+  // El terminal se identifica con un token que el administrador genera una vez en ese ordenador.
+  const terminalOnly = (req, res, next) => {
+    const token = req.get('x-terminal-token') || '';
+    const terminal = token && db.prepare('SELECT * FROM terminals WHERE token_hash = ? AND active = 1').get(sha256(token));
+    if (!terminal) return next(new ApiError(401, 'terminal_unauthorized'));
+    db.prepare('UPDATE terminals SET last_seen_at = ? WHERE id = ?').run(now(), terminal.id);
+    req.terminal = terminal;
+    next();
+  };
+
+  // Operarios activos con PIN y con alguna OT abierta asignada: los que pueden fichar en el terminal.
+  router.get('/terminal/workers', terminalOnly, (req, res) => {
+    res.json(db.prepare(`
+      SELECT u.id, u.full_name, u.lang, c.code AS company_code,
+        EXISTS (SELECT 1 FROM time_entries e WHERE e.user_id = u.id AND e.end_at IS NULL) AS clocked_in
+      FROM users u JOIN companies c ON c.id = u.company_id
+      WHERE u.active = 1 AND u.role = 'worker' AND u.pin_hash IS NOT NULL
+        AND EXISTS (SELECT 1 FROM assignments a JOIN work_orders w ON w.id = a.work_order_id
+                    WHERE a.user_id = u.id AND a.removed_at IS NULL AND w.status = 'open')
+      ORDER BY u.full_name`).all().map((w) => ({ ...w, clocked_in: Boolean(w.clocked_in) })));
+  });
+
+  router.post('/terminal/login', terminalOnly, (req, res) => {
+    const userId = parseId(req.body.user_id, 'user_required');
+    const pin = typeof req.body.pin === 'string' ? req.body.pin : '';
+    const failures = (pinFailures.get(userId) || []).filter((t) => Date.now() - t < LOGIN_WINDOW_MS);
+    if (failures.length >= MAX_PIN_FAILURES) throw new ApiError(429, 'pin_locked');
+    const user = getUser(userId);
+    if (!user || !user.active || user.role !== 'worker' || !user.pin_hash || !verifyPassword(pin, user.pin_hash)) {
+      pinFailures.set(userId, [...failures, Date.now()]);
+      throw new ApiError(401, 'invalid_pin');
+    }
+    pinFailures.delete(userId);
+    audit(user.id, 'terminal.login', { terminal_id: req.terminal.id, terminal: req.terminal.name });
+    res.json({ token: createSession(user.id, TERMINAL_SESSION_MINUTES), user: publicUser(user) });
   });
 
   router.use(authenticate);
@@ -249,6 +301,13 @@ const createApi = (db) => {
     res.json(users.map((u) => ({ ...publicUser(u), active_assignments: u.active_assignments, clocked_in_ot: u.clocked_in_ot })));
   });
 
+  // PIN del ordenador de fichaje: vacío o ausente = sin cambios.
+  const readPin = (body) => {
+    if (body.pin === undefined || body.pin === null || body.pin === '') return null;
+    if (!PIN_PATTERN.test(String(body.pin))) throw new ApiError(400, 'invalid_pin_format');
+    return hashPassword(String(body.pin));
+  };
+
   const readUserFields = (body, existing = {}) => {
     const role = body.role ?? existing.role ?? 'worker';
     if (!['admin', 'worker'].includes(role)) throw new ApiError(400, 'invalid_role');
@@ -271,11 +330,12 @@ const createApi = (db) => {
     const password = String(req.body.password || '');
     if (password.length < 4) throw new ApiError(400, 'password_too_short');
     const fields = readUserFields(req.body);
+    const pinHash = readPin(req.body);
     if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) throw new ApiError(409, 'username_taken');
     const result = db.prepare(`
-      INSERT INTO users (username, full_name, doc_id, rank, password_hash, role, company_id, lang, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(username, fields.full_name, fields.doc_id, fields.rank, hashPassword(password), fields.role, fields.company_id, fields.lang, now());
+      INSERT INTO users (username, full_name, doc_id, rank, password_hash, pin_hash, role, company_id, lang, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(username, fields.full_name, fields.doc_id, fields.rank, hashPassword(password), pinHash, fields.role, fields.company_id, fields.lang, now());
     const id = Number(result.lastInsertRowid);
     audit(req.user.id, 'user.create', { user_id: id, username });
     res.status(201).json(publicUser(getUser(id)));
@@ -285,12 +345,14 @@ const createApi = (db) => {
     const existing = getUser(parseId(req.params.id, 'user_not_found'));
     if (!existing) throw new ApiError(404, 'user_not_found');
     const fields = readUserFields(req.body, existing);
+    const pinHash = readPin(req.body);
     const active = req.body.active === undefined ? Boolean(existing.active) : Boolean(req.body.active);
     if (existing.id === req.user.id && (!active || fields.role !== 'admin')) throw new ApiError(400, 'cannot_demote_self');
 
     transaction(db, () => {
       db.prepare('UPDATE users SET full_name = ?, doc_id = ?, rank = ?, role = ?, company_id = ?, lang = ?, active = ? WHERE id = ?')
         .run(fields.full_name, fields.doc_id, fields.rank, fields.role, fields.company_id, fields.lang, active ? 1 : 0, existing.id);
+      if (pinHash) db.prepare('UPDATE users SET pin_hash = ? WHERE id = ?').run(pinHash, existing.id);
       if (req.body.password) {
         if (String(req.body.password).length < 4) throw new ApiError(400, 'password_too_short');
         db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(String(req.body.password)), existing.id);
@@ -302,7 +364,9 @@ const createApi = (db) => {
         closeOpenEntry(existing.id, req.user.id, null, 'user_deactivated');
         db.prepare('DELETE FROM sessions WHERE user_id = ?').run(existing.id);
       }
-      audit(req.user.id, 'user.update', { user_id: existing.id, ...fields, active, password_reset: Boolean(req.body.password) });
+      audit(req.user.id, 'user.update', {
+        user_id: existing.id, ...fields, active, password_reset: Boolean(req.body.password), pin_reset: Boolean(pinHash),
+      });
     });
     res.json(publicUser(getUser(existing.id)));
   });
@@ -508,6 +572,30 @@ const createApi = (db) => {
       return count;
     });
     res.json({ updated });
+  });
+
+  router.get('/terminals', (req, res) => {
+    res.json(db.prepare(`
+      SELECT t.id, t.name, t.created_at, t.last_seen_at, u.full_name AS created_by_name
+      FROM terminals t LEFT JOIN users u ON u.id = t.created_by WHERE t.active = 1 ORDER BY t.name`).all());
+  });
+
+  // Devuelve el token una sola vez: se guarda en el ordenador que se está configurando.
+  router.post('/terminals', (req, res) => {
+    const name = requireText(req.body.name, 'name_required');
+    const token = crypto.randomBytes(32).toString('hex');
+    const result = db.prepare('INSERT INTO terminals (name, token_hash, created_at, created_by) VALUES (?, ?, ?, ?)')
+      .run(name, sha256(token), now(), req.user.id);
+    const id = Number(result.lastInsertRowid);
+    audit(req.user.id, 'terminal.create', { terminal_id: id, name });
+    res.status(201).json({ id, name, token });
+  });
+
+  router.delete('/terminals/:id', (req, res) => {
+    const id = parseId(req.params.id, 'invalid_id');
+    db.prepare('UPDATE terminals SET active = 0 WHERE id = ?').run(id);
+    audit(req.user.id, 'terminal.revoke', { terminal_id: id });
+    res.json({ ok: true });
   });
 
   router.get('/holidays', (req, res) => res.json(db.prepare('SELECT * FROM holidays ORDER BY date').all()));
