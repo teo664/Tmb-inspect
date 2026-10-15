@@ -209,6 +209,7 @@ const renderLogin = () => {
           <span class="mode-icon">🖥️</span><strong>${tr('mode_large')}</strong><span class="muted">${tr('mode_large_hint')}</span>
         </button>
       </div>
+      <a class="course-link" href="/curso/operarios.html#${currentLang === 'es' ? 'en' : currentLang}" target="_blank" rel="noopener">${tr('course_link')}</a>
     </form>`;
   $$('.login-lang').forEach((button) => {
     button.onclick = () => {

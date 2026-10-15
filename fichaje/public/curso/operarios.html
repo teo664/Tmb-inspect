@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TMB Fichaje Course</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="curso.css">
+</head>
+<body>
+<header class="course-head">
+  <div class="inner">
+    <div class="brand">
+      <span class="mark">TMB</span>
+      <div><h1 id="course-title"></h1><div class="sub" id="course-sub"></div></div>
+    </div>
+    <div class="head-tools">
+      <div class="langs" role="group" aria-label="Language">
+        <button type="button" data-lang="en">English</button>
+        <button type="button" data-lang="ro">Română</button>
+        <button type="button" data-lang="ru">Русский</button>
+      </div>
+      <div class="progress"><div class="bar"><div class="fill" id="progress-fill"></div></div><div class="label" id="progress-label"></div></div>
+    </div>
+  </div>
+</header>
+<div class="layout">
+  <nav class="toc" id="toc" aria-label="Lessons"></nav>
+  <main class="lesson" id="lesson"></main>
+</div>
+
+<script>
+// Curso para los operarios de las subcontratas (SSPT y UNICREW) en inglés, rumano y ruso.
+// Cada lección tiene texto, a veces un simulador de la app y unas preguntas de repaso.
+
+// Textos de la propia app (copiados de i18n.js) para que el simulador se vea igual que la app real.
+const APP = {
+  es: { title: 'Control horario', lang: 'Elige tu idioma', user: 'Usuario', pass: 'Contraseña', view: '¿Cómo quieres ver la pantalla?', mobile: 'Móvil', mobileHint: 'En tu teléfono. La sesión queda abierta.', large: 'Pantalla grande', largeHint: 'Ordenadores táctiles de la empresa. La sesión se cierra sola al fichar.', hello: 'Hola', notWorking: 'No has fichado entrada', selectOt: 'Elige la orden de trabajo', place: '¿Dónde trabajas?', board: 'A bordo', workshop: 'Taller', note: 'Observaciones (opcional)', in: 'Fichar entrada', out: 'Fichar salida', confirmIn: '¿Fichar entrada en {ot}?', confirmOut: '¿Fichar salida ahora?', workingOn: 'Trabajando en', since: 'desde', doneIn: 'Entrada registrada', doneOut: 'Salida registrada', auto: 'Se cerrará la sesión automáticamente', logout: 'Salir', cancel: 'Cancelar', hours: 'Horas', today: 'Hoy', week: 'Esta semana', mine: 'Mis fichajes', last: 'Últimos 31 días', pwd: 'Cambiar contraseña', pending: 'Pendiente', verified: 'Verificado', progress: 'En curso' },
+  en: { title: 'Time tracking', lang: 'Choose your language', user: 'Username', pass: 'Password', view: 'How do you want to see the screen?', mobile: 'Mobile', mobileHint: 'On your phone. You stay signed in.', large: 'Large screen', largeHint: 'Company touch computers. You are signed out after clocking.', hello: 'Hello', notWorking: 'You are not clocked in', selectOt: 'Choose the work order', place: 'Where are you working?', board: 'On board', workshop: 'Workshop', note: 'Notes (optional)', in: 'Clock in', out: 'Clock out', confirmIn: 'Clock in on {ot}?', confirmOut: 'Clock out now?', workingOn: 'Working on', since: 'since', doneIn: 'Clock-in recorded', doneOut: 'Clock-out recorded', auto: 'You will be signed out automatically', logout: 'Log out', cancel: 'Cancel', hours: 'Hours', today: 'Today', week: 'This week', mine: 'My time records', last: 'Last 31 days', pwd: 'Change password', pending: 'Pending', verified: 'Verified', progress: 'In progress' },
+  ro: { title: 'Pontaj', lang: 'Alegeți limba', user: 'Utilizator', pass: 'Parolă', view: 'Cum doriți să vedeți ecranul?', mobile: 'Mobil', mobileHint: 'Pe telefonul dumneavoastră. Sesiunea rămâne deschisă.', large: 'Ecran mare', largeHint: 'Calculatoarele tactile ale firmei. Sesiunea se închide după pontaj.', hello: 'Bună', notWorking: 'Nu ați pontat intrarea', selectOt: 'Alegeți comanda de lucru', place: 'Unde lucrați?', board: 'La bord', workshop: 'Atelier', note: 'Observații (opțional)', in: 'Pontaj intrare', out: 'Pontaj ieșire', confirmIn: 'Pontați intrarea la {ot}?', confirmOut: 'Pontați ieșirea acum?', workingOn: 'Lucrez la', since: 'de la', doneIn: 'Intrare înregistrată', doneOut: 'Ieșire înregistrată', auto: 'Sesiunea se va închide automat', logout: 'Ieșire', cancel: 'Anulează', hours: 'Ore', today: 'Azi', week: 'Săptămâna aceasta', mine: 'Pontajele mele', last: 'Ultimele 31 de zile', pwd: 'Schimbă parola', pending: 'În așteptare', verified: 'Verificat', progress: 'În curs' },
+  ru: { title: 'Учёт рабочего времени', lang: 'Выберите язык', user: 'Логин', pass: 'Пароль', view: 'Как отображать экран?', mobile: 'Мобильный', mobileHint: 'На вашем телефоне. Сессия остаётся открытой.', large: 'Большой экран', largeHint: 'Сенсорные компьютеры компании. Сессия закрывается после отметки.', hello: 'Здравствуйте', notWorking: 'Вы не отметили начало смены', selectOt: 'Выберите заказ-наряд', place: 'Где вы работаете?', board: 'На борту', workshop: 'Мастерская', note: 'Примечание (необязательно)', in: 'Начать смену', out: 'Закончить смену', confirmIn: 'Начать смену по {ot}?', confirmOut: 'Закончить смену сейчас?', workingOn: 'Работаю на', since: 'с', doneIn: 'Начало смены записано', doneOut: 'Окончание смены записано', auto: 'Сессия закроется автоматически', logout: 'Выйти', cancel: 'Отмена', hours: 'Часы', today: 'Сегодня', week: 'Эта неделя', mine: 'Мои отметки', last: 'Последние 31 день', pwd: 'Сменить пароль', pending: 'Ожидает', verified: 'Проверено', progress: 'В процессе' },
+};
+const APP_LANG_NAMES = { es: 'Español', en: 'English', ru: 'Русский', ro: 'Română' };
+
+// Órdenes de trabajo de ejemplo para el simulador.
+const ORDERS = [
+  { id: 1, number: '2362', desc: 'Main engine overhaul', vessel: 'MV Atlantic Star' },
+  { id: 2, number: '2370', desc: 'Hull blasting and painting', vessel: 'MT Canary Spirit' },
+];
+
+const COURSE = {
+  en: {
+    title: 'How to use TMB Fichaje',
+    sub: 'Course for SSPT and UNICREW workers',
+    lesson: 'Lesson', of: 'of', done: 'completed', prev: '← Previous', next: 'Next →', finish: 'Finish course',
+    check: 'Check what you learned', right: 'Correct.', wrong: 'Not quite.', tryAgain: 'Try another answer.',
+    answerAll: 'Answer the questions to continue.', simLabel: 'Try it', reset: 'Start again', phone: 'Your phone', computer: 'TMB touch computer',
+    tip: 'Tip', careful: 'Careful',
+    finishTitle: 'Course completed',
+    finishText: 'You now know how to clock in and out with TMB Fichaje. If you have any problem, ask your foreman or TMB.',
+    finishAgain: 'Review the course',
+    coach: {
+      login: 'Tap a language, then tap “Mobile”.',
+      loginLarge: 'Now try the other option: start again and tap “Large screen”.',
+      loginDoneMobile: 'You are signed in on your phone. The app keeps you signed in.',
+      loginDoneLarge: 'On a company computer you are signed out automatically after clocking.',
+      pickOt: 'Tap the work order you are going to work on.',
+      pickPlace: 'Now tell the app where you are working.',
+      tapIn: 'Tap the green button to clock in.',
+      confirm: 'The app asks you to confirm. Tap OK.',
+      working: 'You are clocked in. The timer shows how long you have been working. When you finish, tap the red button.',
+      confirmOut: 'Confirm with OK.',
+      finished: 'Done. You clocked out. Your record is now waiting for TMB to check it.',
+      largeLogin: 'On the company computer, tap “Large screen”.',
+      largeIn: 'Choose the work order and the place, then tap the green button.',
+      largeDoneIn: 'Recorded. In a few seconds the computer signs you out by itself.',
+      largeBack: 'You were signed out. At the end of the day, sign in again to clock out: tap “Large screen”.',
+      largeOut: 'Tap the red button to clock out.',
+      largeDoneOut: 'Clock-out recorded. The computer is ready for the next person.',
+      records: 'Tap a coloured label to see what it means.',
+      recPending: '“Pending”: TMB has not checked this record yet.',
+      recVerified: '“Verified”: TMB checked it. It will go to your monthly timesheet.',
+      recProgress: '“In progress”: you are clocked in on this work order right now.',
+    },
+    lessons: [
+      {
+        name: 'What the app is for',
+        body: `
+          <p>TMB Fichaje is where you record your working hours at TMB. When you start work you <strong>clock in</strong> on a work order (WO). When you stop, you <strong>clock out</strong>.</p>
+          <p>TMB checks your hours. Your company (SSPT or UNICREW) gets your <strong>monthly timesheet</strong> from these records, so they must be correct.</p>
+          <ul>
+            <li>On your phone: open <span class="key">tmbfichaje.com</span></li>
+            <li>At TMB: use the touch computers</li>
+            <li>TMB gives you your <strong>username</strong> and <strong>password</strong>. Do not share them with anyone.</li>
+          </ul>`,
+        tip: 'Put the app on your phone’s home screen. iPhone: Safari → Share → “Add to Home Screen”. Android: Chrome → ⋮ → “Add to Home screen”.',
+        quiz: [
+          { q: 'Who gives you your username and password?', a: ['TMB', 'Your company (SSPT or UNICREW)', 'You create them yourself'], c: 0, why: 'TMB creates your user and gives you the password.' },
+        ],
+      },
+      {
+        name: 'Signing in',
+        body: `
+          <ol>
+            <li><strong>Choose your language.</strong> The app remembers it for next time.</li>
+            <li>Type your <strong>username</strong> and <strong>password</strong>.</li>
+            <li>Choose how you want to see the screen:
+              <ul>
+                <li><strong>📱 Mobile</strong> on your own phone. You stay signed in.</li>
+                <li><strong>🖥️ Large screen</strong> on TMB’s touch computers. You are signed out automatically after clocking.</li>
+              </ul>
+            </li>
+          </ol>`,
+        warn: 'Never choose “Mobile” on a shared computer. The next person could clock in with your name.',
+        sim: 'login',
+        quiz: [
+          { q: 'You are at a TMB touch computer. Which button do you tap?', a: ['📱 Mobile', '🖥️ Large screen', 'It does not matter'], c: 1, why: 'On shared computers always use “Large screen”, so you are signed out automatically.' },
+        ],
+      },
+      {
+        name: 'Clocking in',
+        body: `
+          <ol>
+            <li><strong>Choose the work order</strong> you are going to work on. You only see the work orders TMB assigned to you. If you only have one, it is already selected.</li>
+            <li><strong>Where are you working?</strong> Tap <strong>On board</strong> (on the ship) or <strong>Workshop</strong>.</li>
+            <li>If you want, write a note.</li>
+            <li>Tap the green <strong>Clock in</strong> button and confirm with <strong>OK</strong>.</li>
+          </ol>
+          <p>The card turns green and a timer starts. That means you are clocked in.</p>`,
+        sim: 'clock',
+        quiz: [
+          { q: 'Today you repair a pump in TMB’s workshop, not on the ship. What do you choose?', a: ['On board', 'Workshop', 'Nothing, it is not important'], c: 1, why: 'Choose where you really work. TMB needs it for the client’s timesheet.' },
+          { q: 'The work order you need is not in your list. What do you do?', a: ['Clock in on another work order', 'Ask your foreman or TMB to assign it to you', 'Do not clock in'], c: 1, why: 'Only TMB can assign work orders. Never clock in on the wrong one.' },
+        ],
+      },
+      {
+        name: 'Clocking out and changing work order',
+        body: `
+          <p>When you finish, tap the red <strong>Clock out</strong> button and confirm with <strong>OK</strong>.</p>
+          <p>You can only be clocked in on <strong>one</strong> work order at a time. To change work order:</p>
+          <ol>
+            <li><strong>Clock out</strong> from the one you are on.</li>
+            <li><strong>Clock in</strong> on the new one.</li>
+          </ol>`,
+        tip: 'You can clock in on the TMB computer and clock out on your phone, or the other way round. It is the same record.',
+        sim: 'clockOut',
+        quiz: [
+          { q: 'After lunch you move from WO 2362 to WO 2370. What do you do?', a: ['Clock in on 2370 directly', 'Clock out from 2362, then clock in on 2370', 'Nothing, TMB will change it'], c: 1, why: 'First clock out, then clock in on the new work order.' },
+        ],
+      },
+      {
+        name: 'Large screen at TMB',
+        body: `
+          <ol>
+            <li>Choose your language, type your username and password and tap <strong>🖥️ Large screen</strong>.</li>
+            <li>Choose the work order and the place, and tap <strong>Clock in</strong>. Here there is no confirmation question.</li>
+            <li>A green message shows the time. After a few seconds you are <strong>signed out automatically</strong>, and the next colleague can sign in.</li>
+          </ol>
+          <p>If you do not touch the screen for <strong>1 minute</strong>, you are signed out too.</p>
+          <p>At the end of the day, sign in again and tap <strong>Clock out</strong>.</p>`,
+        sim: 'large',
+        quiz: [
+          { q: 'You clocked in on the touch computer. What do you have to do to sign out?', a: ['Nothing, it signs me out by itself', 'Switch off the computer', 'Tap “Clock out”'], c: 0, why: 'The large screen signs you out automatically. “Clock out” would end your working time.' },
+        ],
+      },
+      {
+        name: 'Your records',
+        body: `
+          <p>In <strong>Mobile</strong> mode, under the buttons you can see your hours <strong>today</strong> and <strong>this week</strong>, and your records for the last 31 days.</p>
+          <p>Each record has a label:</p>
+          <ul>
+            <li><span class="a-badge g">In progress</span> you are clocked in right now.</li>
+            <li><span class="a-badge a">Pending</span> TMB has not checked it yet.</li>
+            <li><span class="a-badge g">✓ Verified</span> TMB checked it. It goes to your monthly timesheet.</li>
+          </ul>
+          <p>You cannot change your records. If one is wrong, tell your foreman or TMB and they will correct it. All changes are logged.</p>
+          <p>With <strong>Change password</strong> you can choose a new password (at least 4 characters).</p>`,
+        sim: 'records',
+        quiz: [
+          { q: 'One of your records says “Pending”. What does it mean?', a: ['It is wrong and you must repeat it', 'TMB has not checked it yet', 'You did not clock out'], c: 1, why: 'Pending only means that TMB has not checked it yet.' },
+        ],
+      },
+      {
+        name: 'Problems and solutions',
+        table: {
+          head: ['What happens', 'What to do'],
+          rows: [
+            ['I forgot to clock out', 'Tell TMB as soon as possible. They will correct the time.'],
+            ['I forgot to clock in', 'Tell TMB. They will add the record by hand.'],
+            ['“You have no work orders assigned. Contact TMB.”', 'TMB has to assign you a work order.'],
+            ['“Wrong username or password”', 'Check capital letters and try again. If you forgot it, TMB gives you a new one.'],
+            ['“Too many attempts. Wait 15 minutes.”', 'Wait 15 minutes and try again.'],
+            ['“You are already clocked in”', 'You have an open record. Clock out first.'],
+            ['“No connection to the server”', 'Check Wi-Fi or mobile data and try again.'],
+          ],
+        },
+        quiz: [
+          { q: 'Yesterday you forgot to clock out. What do you do?', a: ['Nothing', 'Tell TMB so they correct the time', 'Clock out today twice'], c: 1, why: 'Only TMB can correct records. Tell them as soon as possible.' },
+          { q: 'The app says “You are already clocked in”. What does it mean?', a: ['You have an open record: clock out first', 'Your password is wrong', 'The app is broken'], c: 0, why: 'You can only have one open record at a time.' },
+          { q: 'What must always be true about your records?', a: ['They match the hours and work order you really worked', 'They are all in the morning', 'They are on your phone only'], c: 0, why: 'Your monthly timesheet is made from your records.' },
+        ],
+      },
+    ],
+  },
+
+  ro: {
+    title: 'Cum se folosește TMB Fichaje',
+    sub: 'Curs pentru muncitorii SSPT și UNICREW',
+    lesson: 'Lecția', of: 'din', done: 'terminate', prev: '← Înapoi', next: 'Înainte →', finish: 'Termină cursul',
+    check: 'Verificați ce ați învățat', right: 'Corect.', wrong: 'Nu chiar.', tryAgain: 'Încercați alt răspuns.',
+    answerAll: 'Răspundeți la întrebări pentru a continua.', simLabel: 'Încercați', reset: 'De la început', phone: 'Telefonul dumneavoastră', computer: 'Calculator tactil TMB',
+    tip: 'Sfat', careful: 'Atenție',
+    finishTitle: 'Curs terminat',
+    finishText: 'Acum știți să pontați intrarea și ieșirea în TMB Fichaje. Dacă aveți o problemă, întrebați șeful de echipă sau TMB.',
+    finishAgain: 'Revedeți cursul',
+    coach: {
+      login: 'Atingeți o limbă, apoi atingeți „Mobil”.',
+      loginLarge: 'Încercați și cealaltă opțiune: începeți din nou și atingeți „Ecran mare”.',
+      loginDoneMobile: 'Ați intrat pe telefon. Aplicația vă păstrează sesiunea deschisă.',
+      loginDoneLarge: 'Pe un calculator al firmei, sesiunea se închide automat după pontaj.',
+      pickOt: 'Atingeți comanda de lucru la care veți lucra.',
+      pickPlace: 'Acum spuneți unde lucrați.',
+      tapIn: 'Atingeți butonul verde pentru a ponta intrarea.',
+      confirm: 'Aplicația vă cere confirmarea. Atingeți OK.',
+      working: 'Ați pontat intrarea. Cronometrul arată cât timp lucrați. Când terminați, atingeți butonul roșu.',
+      confirmOut: 'Confirmați cu OK.',
+      finished: 'Gata. Ați pontat ieșirea. Pontajul așteaptă acum verificarea TMB.',
+      largeLogin: 'Pe calculatorul firmei, atingeți „Ecran mare”.',
+      largeIn: 'Alegeți comanda și locul, apoi atingeți butonul verde.',
+      largeDoneIn: 'Înregistrat. În câteva secunde calculatorul închide singur sesiunea.',
+      largeBack: 'Sesiunea s-a închis. La sfârșitul zilei intrați din nou pentru ieșire: atingeți „Ecran mare”.',
+      largeOut: 'Atingeți butonul roșu pentru a ponta ieșirea.',
+      largeDoneOut: 'Ieșire înregistrată. Calculatorul este gata pentru următorul coleg.',
+      records: 'Atingeți o etichetă colorată pentru a vedea ce înseamnă.',
+      recPending: '„În așteptare”: TMB nu a verificat încă acest pontaj.',
+      recVerified: '„Verificat”: TMB l-a verificat. Va apărea în fișa lunară.',
+      recProgress: '„În curs”: acum sunteți pontat la această comandă.',
+    },
+    lessons: [
+      {
+        name: 'La ce folosește aplicația',
+        body: `
+          <p>În TMB Fichaje vă înregistrați orele de lucru la TMB. Când începeți lucrul, <strong>pontați intrarea</strong> la o comandă de lucru. Când vă opriți, <strong>pontați ieșirea</strong>.</p>
+          <p>TMB vă verifică orele. Firma dumneavoastră (SSPT sau UNICREW) primește <strong>fișa lunară</strong> făcută din aceste pontaje, deci trebuie să fie corecte.</p>
+          <ul>
+            <li>Pe telefon: deschideți <span class="key">tmbfichaje.com</span></li>
+            <li>La TMB: folosiți calculatoarele tactile</li>
+            <li>TMB vă dă <strong>utilizatorul</strong> și <strong>parola</strong>. Nu le dați nimănui.</li>
+          </ul>`,
+        tip: 'Puneți aplicația pe ecranul principal al telefonului. iPhone: Safari → Partajare → „Adaugă pe ecranul principal”. Android: Chrome → ⋮ → „Adaugă pe ecranul de pornire”.',
+        quiz: [
+          { q: 'Cine vă dă utilizatorul și parola?', a: ['TMB', 'Firma mea (SSPT sau UNICREW)', 'Le creez eu'], c: 0, why: 'TMB vă creează utilizatorul și vă dă parola.' },
+        ],
+      },
+      {
+        name: 'Intrarea în aplicație',
+        body: `
+          <ol>
+            <li><strong>Alegeți limba.</strong> Aplicația o ține minte data viitoare.</li>
+            <li>Scrieți <strong>utilizatorul</strong> și <strong>parola</strong>.</li>
+            <li>Alegeți cum vreți să vedeți ecranul:
+              <ul>
+                <li><strong>📱 Mobil</strong> pe telefonul dumneavoastră. Sesiunea rămâne deschisă.</li>
+                <li><strong>🖥️ Ecran mare</strong> pe calculatoarele tactile TMB. Sesiunea se închide automat după pontaj.</li>
+              </ul>
+            </li>
+          </ol>`,
+        warn: 'Nu alegeți niciodată „Mobil” pe un calculator comun. Următorul coleg ar putea ponta cu numele dumneavoastră.',
+        sim: 'login',
+        quiz: [
+          { q: 'Sunteți la un calculator tactil TMB. Ce buton atingeți?', a: ['📱 Mobil', '🖥️ Ecran mare', 'Nu contează'], c: 1, why: 'Pe calculatoarele comune folosiți mereu „Ecran mare”, ca sesiunea să se închidă singură.' },
+        ],
+      },
+      {
+        name: 'Pontaj intrare',
+        body: `
+          <ol>
+            <li><strong>Alegeți comanda de lucru</strong> la care veți lucra. Vedeți doar comenzile pe care vi le-a alocat TMB. Dacă aveți doar una, este deja aleasă.</li>
+            <li><strong>Unde lucrați?</strong> Atingeți <strong>La bord</strong> (pe navă) sau <strong>Atelier</strong>.</li>
+            <li>Dacă vreți, scrieți o observație.</li>
+            <li>Atingeți butonul verde <strong>Pontaj intrare</strong> și confirmați cu <strong>OK</strong>.</li>
+          </ol>
+          <p>Cardul devine verde și pornește un cronometru. Asta înseamnă că sunteți pontat.</p>`,
+        sim: 'clock',
+        quiz: [
+          { q: 'Azi reparați o pompă în atelierul TMB, nu pe navă. Ce alegeți?', a: ['La bord', 'Atelier', 'Nimic, nu e important'], c: 1, why: 'Alegeți locul unde lucrați cu adevărat. TMB are nevoie de el pentru fișa clientului.' },
+          { q: 'Comanda de care aveți nevoie nu este în listă. Ce faceți?', a: ['Pontez la altă comandă', 'Îi cer șefului de echipă sau TMB să mi-o aloce', 'Nu pontez'], c: 1, why: 'Doar TMB poate aloca comenzi. Nu pontați niciodată la comanda greșită.' },
+        ],
+      },
+      {
+        name: 'Pontaj ieșire și schimbarea comenzii',
+        body: `
+          <p>Când terminați, atingeți butonul roșu <strong>Pontaj ieșire</strong> și confirmați cu <strong>OK</strong>.</p>
+          <p>Puteți fi pontat la o <strong>singură</strong> comandă odată. Pentru a schimba comanda:</p>
+          <ol>
+            <li><strong>Pontați ieșirea</strong> de la comanda curentă.</li>
+            <li><strong>Pontați intrarea</strong> la comanda nouă.</li>
+          </ol>`,
+        tip: 'Puteți ponta intrarea la calculatorul TMB și ieșirea pe telefon, sau invers. Este același pontaj.',
+        sim: 'clockOut',
+        quiz: [
+          { q: 'După prânz treceți de la comanda 2362 la comanda 2370. Ce faceți?', a: ['Pontez direct intrarea la 2370', 'Pontez ieșirea de la 2362, apoi intrarea la 2370', 'Nimic, schimbă TMB'], c: 1, why: 'Mai întâi ieșirea, apoi intrarea la comanda nouă.' },
+        ],
+      },
+      {
+        name: 'Ecranul mare la TMB',
+        body: `
+          <ol>
+            <li>Alegeți limba, scrieți utilizatorul și parola și atingeți <strong>🖥️ Ecran mare</strong>.</li>
+            <li>Alegeți comanda și locul și atingeți <strong>Pontaj intrare</strong>. Aici nu există întrebare de confirmare.</li>
+            <li>Un mesaj verde arată ora. După câteva secunde sesiunea se <strong>închide automat</strong> și următorul coleg poate intra.</li>
+          </ol>
+          <p>Dacă nu atingeți ecranul timp de <strong>1 minut</strong>, sesiunea se închide de asemenea.</p>
+          <p>La sfârșitul zilei, intrați din nou și atingeți <strong>Pontaj ieșire</strong>.</p>`,
+        sim: 'large',
+        quiz: [
+          { q: 'Ați pontat intrarea la calculatorul tactil. Ce trebuie să faceți ca să închideți sesiunea?', a: ['Nimic, se închide singură', 'Opresc calculatorul', 'Ating „Pontaj ieșire”'], c: 0, why: 'Ecranul mare închide sesiunea automat. „Pontaj ieșire” v-ar termina ziua de lucru.' },
+        ],
+      },
+      {
+        name: 'Pontajele dumneavoastră',
+        body: `
+          <p>În modul <strong>Mobil</strong>, sub butoane vedeți orele de <strong>azi</strong> și din <strong>săptămâna aceasta</strong>, și pontajele din ultimele 31 de zile.</p>
+          <p>Fiecare pontaj are o etichetă:</p>
+          <ul>
+            <li><span class="a-badge g">În curs</span> sunteți pontat acum.</li>
+            <li><span class="a-badge a">În așteptare</span> TMB nu l-a verificat încă.</li>
+            <li><span class="a-badge g">✓ Verificat</span> TMB l-a verificat. Intră în fișa lunară.</li>
+          </ul>
+          <p>Nu puteți modifica pontajele. Dacă unul este greșit, spuneți-i șefului de echipă sau TMB și îl vor corecta. Toate modificările rămân înregistrate.</p>
+          <p>Cu <strong>Schimbă parola</strong> puteți alege o parolă nouă (minim 4 caractere).</p>`,
+        sim: 'records',
+        quiz: [
+          { q: 'Un pontaj spune „În așteptare”. Ce înseamnă?', a: ['Este greșit și trebuie repetat', 'TMB nu l-a verificat încă', 'Nu ați pontat ieșirea'], c: 1, why: '„În așteptare” înseamnă doar că TMB nu l-a verificat încă.' },
+        ],
+      },
+      {
+        name: 'Probleme și soluții',
+        table: {
+          head: ['Ce se întâmplă', 'Ce faceți'],
+          rows: [
+            ['Am uitat să pontez ieșirea', 'Spuneți-i TMB cât mai repede. Vor corecta ora.'],
+            ['Am uitat să pontez intrarea', 'Spuneți-i TMB. Vor adăuga pontajul manual.'],
+            ['„Nu aveți comenzi de lucru alocate. Contactați TMB.”', 'TMB trebuie să vă aloce o comandă.'],
+            ['„Utilizator sau parolă greșită”', 'Verificați literele mari și încercați din nou. Dacă ați uitat parola, TMB vă dă una nouă.'],
+            ['„Prea multe încercări. Așteptați 15 minute.”', 'Așteptați 15 minute și încercați din nou.'],
+            ['„Aveți deja un pontaj deschis”', 'Sunteți deja pontat. Pontați mai întâi ieșirea.'],
+            ['„Fără conexiune la server”', 'Verificați Wi-Fi sau datele mobile și încercați din nou.'],
+          ],
+        },
+        quiz: [
+          { q: 'Ieri ați uitat să pontați ieșirea. Ce faceți?', a: ['Nimic', 'Îi spun lui TMB să corecteze ora', 'Pontez ieșirea de două ori azi'], c: 1, why: 'Doar TMB poate corecta pontajele. Spuneți-le cât mai repede.' },
+          { q: 'Aplicația spune „Aveți deja un pontaj deschis”. Ce înseamnă?', a: ['Aveți un pontaj deschis: pontați mai întâi ieșirea', 'Parola este greșită', 'Aplicația nu merge'], c: 0, why: 'Puteți avea un singur pontaj deschis odată.' },
+          { q: 'Ce trebuie să fie mereu adevărat despre pontajele dumneavoastră?', a: ['Corespund orelor și comenzii la care ați lucrat cu adevărat', 'Sunt toate dimineața', 'Sunt doar pe telefon'], c: 0, why: 'Fișa lunară se face din pontajele dumneavoastră.' },
+        ],
+      },
+    ],
+  },
+
+  ru: {
+    title: 'Как пользоваться TMB Fichaje',
+    sub: 'Курс для работников SSPT и UNICREW',
+    lesson: 'Урок', of: 'из', done: 'пройдено', prev: '← Назад', next: 'Далее →', finish: 'Завершить курс',
+    check: 'Проверьте себя', right: 'Верно.', wrong: 'Не совсем.', tryAgain: 'Попробуйте другой ответ.',
+    answerAll: 'Ответьте на вопросы, чтобы продолжить.', simLabel: 'Попробуйте', reset: 'Сначала', phone: 'Ваш телефон', computer: 'Сенсорный компьютер TMB',
+    tip: 'Совет', careful: 'Внимание',
+    finishTitle: 'Курс пройден',
+    finishText: 'Теперь вы умеете отмечать начало и конец смены в TMB Fichaje. Если возникнет проблема, обратитесь к бригадиру или в TMB.',
+    finishAgain: 'Пройти курс ещё раз',
+    coach: {
+      login: 'Нажмите на язык, затем нажмите «Мобильный».',
+      loginLarge: 'Попробуйте другой вариант: начните сначала и нажмите «Большой экран».',
+      loginDoneMobile: 'Вы вошли с телефона. Приложение не закрывает сессию.',
+      loginDoneLarge: 'На компьютере компании сессия закрывается автоматически после отметки.',
+      pickOt: 'Нажмите на заказ-наряд, по которому будете работать.',
+      pickPlace: 'Теперь укажите, где вы работаете.',
+      tapIn: 'Нажмите зелёную кнопку, чтобы начать смену.',
+      confirm: 'Приложение просит подтвердить. Нажмите OK.',
+      working: 'Смена начата. Таймер показывает, сколько вы уже работаете. Когда закончите, нажмите красную кнопку.',
+      confirmOut: 'Подтвердите нажатием OK.',
+      finished: 'Готово. Смена закончена. Теперь отметка ждёт проверки TMB.',
+      largeLogin: 'На компьютере компании нажмите «Большой экран».',
+      largeIn: 'Выберите заказ-наряд и место, затем нажмите зелёную кнопку.',
+      largeDoneIn: 'Записано. Через несколько секунд компьютер сам закроет сессию.',
+      largeBack: 'Сессия закрыта. В конце дня войдите снова, чтобы закончить смену: нажмите «Большой экран».',
+      largeOut: 'Нажмите красную кнопку, чтобы закончить смену.',
+      largeDoneOut: 'Окончание смены записано. Компьютер готов для следующего работника.',
+      records: 'Нажмите на цветную метку, чтобы узнать, что она значит.',
+      recPending: '«Ожидает»: TMB ещё не проверил эту отметку.',
+      recVerified: '«Проверено»: TMB проверил её. Она попадёт в ваш месячный табель.',
+      recProgress: '«В процессе»: вы сейчас на смене по этому наряду.',
+    },
+    lessons: [
+      {
+        name: 'Для чего приложение',
+        body: `
+          <p>В TMB Fichaje вы отмечаете своё рабочее время в TMB. Когда начинаете работу, вы <strong>начинаете смену</strong> по заказ-наряду. Когда заканчиваете, вы <strong>заканчиваете смену</strong>.</p>
+          <p>TMB проверяет ваши часы. Ваша компания (SSPT или UNICREW) получает <strong>месячный табель</strong>, составленный по этим отметкам, поэтому они должны быть верными.</p>
+          <ul>
+            <li>На телефоне: откройте <span class="key">tmbfichaje.com</span></li>
+            <li>В TMB: используйте сенсорные компьютеры</li>
+            <li><strong>Логин</strong> и <strong>пароль</strong> вам выдаёт TMB. Никому их не сообщайте.</li>
+          </ul>`,
+        tip: 'Добавьте приложение на главный экран телефона. iPhone: Safari → «Поделиться» → «На экран „Домой“». Android: Chrome → ⋮ → «Добавить на главный экран».',
+        quiz: [
+          { q: 'Кто выдаёт вам логин и пароль?', a: ['TMB', 'Моя компания (SSPT или UNICREW)', 'Я придумываю их сам'], c: 0, why: 'TMB создаёт вашего пользователя и выдаёт пароль.' },
+        ],
+      },
+      {
+        name: 'Вход в приложение',
+        body: `
+          <ol>
+            <li><strong>Выберите язык.</strong> Приложение его запомнит.</li>
+            <li>Введите <strong>логин</strong> и <strong>пароль</strong>.</li>
+            <li>Выберите, как отображать экран:
+              <ul>
+                <li><strong>📱 Мобильный</strong> на вашем телефоне. Сессия остаётся открытой.</li>
+                <li><strong>🖥️ Большой экран</strong> на сенсорных компьютерах TMB. Сессия закрывается автоматически после отметки.</li>
+              </ul>
+            </li>
+          </ol>`,
+        warn: 'Никогда не выбирайте «Мобильный» на общем компьютере. Следующий человек сможет отметиться под вашим именем.',
+        sim: 'login',
+        quiz: [
+          { q: 'Вы у сенсорного компьютера TMB. Какую кнопку нажать?', a: ['📱 Мобильный', '🖥️ Большой экран', 'Всё равно'], c: 1, why: 'На общих компьютерах всегда выбирайте «Большой экран», чтобы сессия закрылась сама.' },
+        ],
+      },
+      {
+        name: 'Начало смены',
+        body: `
+          <ol>
+            <li><strong>Выберите заказ-наряд</strong>, по которому будете работать. Вы видите только наряды, на которые вас назначил TMB. Если наряд один, он уже выбран.</li>
+            <li><strong>Где вы работаете?</strong> Нажмите <strong>На борту</strong> (на судне) или <strong>Мастерская</strong>.</li>
+            <li>При желании напишите примечание.</li>
+            <li>Нажмите зелёную кнопку <strong>Начать смену</strong> и подтвердите нажатием <strong>OK</strong>.</li>
+          </ol>
+          <p>Карточка становится зелёной и запускается таймер. Это значит, что смена начата.</p>`,
+        sim: 'clock',
+        quiz: [
+          { q: 'Сегодня вы ремонтируете насос в мастерской TMB, а не на судне. Что выбрать?', a: ['На борту', 'Мастерская', 'Ничего, это неважно'], c: 1, why: 'Выбирайте место, где вы действительно работаете. TMB это нужно для табеля клиента.' },
+          { q: 'Нужного наряда нет в списке. Что делать?', a: ['Отметиться по другому наряду', 'Попросить бригадира или TMB назначить его', 'Не отмечаться'], c: 1, why: 'Назначать наряды может только TMB. Никогда не отмечайтесь по чужому наряду.' },
+        ],
+      },
+      {
+        name: 'Конец смены и смена наряда',
+        body: `
+          <p>Когда закончите, нажмите красную кнопку <strong>Закончить смену</strong> и подтвердите нажатием <strong>OK</strong>.</p>
+          <p>Одновременно можно быть на смене только по <strong>одному</strong> наряду. Чтобы перейти на другой наряд:</p>
+          <ol>
+            <li><strong>Закончите смену</strong> по текущему наряду.</li>
+            <li><strong>Начните смену</strong> по новому.</li>
+          </ol>`,
+        tip: 'Можно начать смену на компьютере TMB, а закончить на телефоне, или наоборот. Это одна и та же отметка.',
+        sim: 'clockOut',
+        quiz: [
+          { q: 'После обеда вы переходите с наряда 2362 на наряд 2370. Что делать?', a: ['Сразу начать смену по 2370', 'Закончить смену по 2362, затем начать по 2370', 'Ничего, TMB поменяет сам'], c: 1, why: 'Сначала закончите смену, потом начните по новому наряду.' },
+        ],
+      },
+      {
+        name: 'Большой экран в TMB',
+        body: `
+          <ol>
+            <li>Выберите язык, введите логин и пароль и нажмите <strong>🖥️ Большой экран</strong>.</li>
+            <li>Выберите наряд и место и нажмите <strong>Начать смену</strong>. Здесь нет вопроса-подтверждения.</li>
+            <li>Зелёное сообщение показывает время. Через несколько секунд сессия <strong>закрывается автоматически</strong>, и может войти следующий работник.</li>
+          </ol>
+          <p>Если вы не касаетесь экрана <strong>1 минуту</strong>, сессия тоже закрывается.</p>
+          <p>В конце дня войдите снова и нажмите <strong>Закончить смену</strong>.</p>`,
+        sim: 'large',
+        quiz: [
+          { q: 'Вы начали смену на сенсорном компьютере. Что нужно сделать, чтобы выйти?', a: ['Ничего, сессия закроется сама', 'Выключить компьютер', 'Нажать «Закончить смену»'], c: 0, why: 'Большой экран закрывает сессию автоматически. «Закончить смену» завершит ваш рабочий день.' },
+        ],
+      },
+      {
+        name: 'Ваши отметки',
+        body: `
+          <p>В режиме <strong>Мобильный</strong> под кнопками видны ваши часы <strong>сегодня</strong> и <strong>за эту неделю</strong>, а также отметки за последние 31 день.</p>
+          <p>У каждой отметки есть метка:</p>
+          <ul>
+            <li><span class="a-badge g">В процессе</span> вы сейчас на смене.</li>
+            <li><span class="a-badge a">Ожидает</span> TMB ещё не проверил её.</li>
+            <li><span class="a-badge g">✓ Проверено</span> TMB проверил её. Она попадает в месячный табель.</li>
+          </ul>
+          <p>Вы не можете изменять отметки. Если отметка неверна, скажите бригадиру или в TMB, и её исправят. Все изменения записываются.</p>
+          <p>Кнопка <strong>Сменить пароль</strong> позволяет задать новый пароль (не короче 4 символов).</p>`,
+        sim: 'records',
+        quiz: [
+          { q: 'У отметки метка «Ожидает». Что это значит?', a: ['Она неверна, нужно отметиться заново', 'TMB ещё не проверил её', 'Вы не закончили смену'], c: 1, why: '«Ожидает» значит только, что TMB её ещё не проверил.' },
+        ],
+      },
+      {
+        name: 'Проблемы и решения',
+        table: {
+          head: ['Что случилось', 'Что делать'],
+          rows: [
+            ['Забыл закончить смену', 'Как можно скорее сообщите в TMB. Там исправят время.'],
+            ['Забыл начать смену', 'Сообщите в TMB. Там добавят отметку вручную.'],
+            ['«У вас нет назначенных заказ-нарядов. Свяжитесь с TMB.»', 'TMB должен назначить вам наряд.'],
+            ['«Неверный логин или пароль»', 'Проверьте заглавные буквы и попробуйте снова. Если забыли пароль, TMB выдаст новый.'],
+            ['«Слишком много попыток. Подождите 15 минут.»', 'Подождите 15 минут и попробуйте снова.'],
+            ['«Смена уже начата»', 'У вас есть открытая отметка. Сначала закончите смену.'],
+            ['«Нет связи с сервером»', 'Проверьте Wi-Fi или мобильный интернет и попробуйте снова.'],
+          ],
+        },
+        quiz: [
+          { q: 'Вчера вы забыли закончить смену. Что делать?', a: ['Ничего', 'Сообщить в TMB, чтобы исправили время', 'Сегодня закончить смену два раза'], c: 1, why: 'Исправлять отметки может только TMB. Сообщите как можно скорее.' },
+          { q: 'Приложение пишет «Смена уже начата». Что это значит?', a: ['У вас открытая отметка: сначала закончите смену', 'Неверный пароль', 'Приложение сломалось'], c: 0, why: 'Одновременно может быть только одна открытая отметка.' },
+          { q: 'Что всегда должно быть верно в ваших отметках?', a: ['Они совпадают с реальными часами и нарядом', 'Все они утром', 'Они только на телефоне'], c: 0, why: 'Ваш месячный табель составляется по вашим отметкам.' },
+        ],
+      },
+    ],
+  },
+};
+
+// ── Estado ──
+const STORE_KEY = 'tmb_curso_operarios';
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } },
+  set(value) { try { localStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch { /* sin almacenamiento */ } },
+};
+const saved = store.get();
+const hashLang = location.hash.replace('#', '');
+const state = {
+  lang: COURSE[hashLang] ? hashLang : (COURSE[saved.lang] ? saved.lang : (COURSE[(navigator.language || '').slice(0, 2)] ? navigator.language.slice(0, 2) : 'en')),
+  index: Number.isInteger(saved.index) ? saved.index : 0,
+  done: new Set(saved.done || []),
+  answered: {},
+  finished: false,
+};
+const persist = () => store.set({ lang: state.lang, index: state.index, done: [...state.done] });
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const C = () => COURSE[state.lang];
+
+// ── Simuladores ──
+let sim = null;
+let simTimers = [];
+let simTicker = null;
+const clearSimTimers = () => { simTimers.forEach(clearTimeout); simTimers = []; clearInterval(simTicker); };
+const clockText = (ms) => {
+  const s = Math.floor(ms / 1000);
+  return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((n) => String(n).padStart(2, '0')).join(':');
+};
+const nowTime = (offsetMin = 0) => new Date(Date.now() + offsetMin * 60000).toLocaleTimeString(state.lang, { hour: '2-digit', minute: '2-digit' });
+
+const newSim = (kind) => {
+  const base = { kind, appLang: state.lang, ot: null, place: null, dialog: null, coach: null };
+  if (kind === 'login') return { ...base, screen: 'login', tried: [] };
+  if (kind === 'clock') return { ...base, screen: 'idle' };
+  if (kind === 'clockOut') return { ...base, screen: 'working', ot: ORDERS[0], place: 'board', start: Date.now() - (3 * 3600 + 25 * 60) * 1000 };
+  if (kind === 'large') return { ...base, screen: 'login', working: false };
+  if (kind === 'records') return { ...base, screen: 'records' };
+  return base;
+};
+
+const appBar = (a, large) => `<div class="app-bar"><span><span class="m">TMB</span> ${esc(a.title)}</span>${large === false ? '' : `<span class="out">${esc(a.logout)}</span>`}</div>`;
+
+const loginScreen = (s, a) => {
+  const pulseLarge = s.kind === 'large' || (s.tried || []).includes('mobile');
+  return `
+  ${appBar(a, false)}
+  <div class="app-body">
+    <div class="a-card">
+      <div class="a-label">${esc(a.lang)}</div>
+      <div class="a-langs">${Object.keys(APP_LANG_NAMES).map((l) => `<button type="button" class="a-opt${l === s.appLang ? ' sel' : ''}" data-act="lang" data-v="${l}">${APP_LANG_NAMES[l]}</button>`).join('')}</div>
+      <div class="a-label">${esc(a.user)}</div><input class="a-input" value="ivan.petrov" aria-label="${esc(a.user)}" readonly>
+      <div class="a-label">${esc(a.pass)}</div><input class="a-input" type="password" value="12345678" aria-label="${esc(a.pass)}" readonly>
+      <div class="a-label">${esc(a.view)}</div>
+      <div class="a-row">
+        <button type="button" class="a-opt${pulseLarge ? '' : ' pulse'}" data-act="mode" data-v="mobile"><strong>📱 ${esc(a.mobile)}</strong><span class="a-muted">${esc(a.mobileHint)}</span></button>
+        <button type="button" class="a-opt${pulseLarge ? ' pulse' : ''}" data-act="mode" data-v="large"><strong>🖥️ ${esc(a.large)}</strong><span class="a-muted">${esc(a.largeHint)}</span></button>
+      </div>
+    </div>
+  </div>`;
+};
+
+const otList = (s) => ORDERS.map((o) => `
+  <button type="button" class="a-opt${s.ot?.id === o.id ? ' sel' : ''}${!s.ot ? ' pulse' : ''}" data-act="ot" data-v="${o.id}">
+    <strong>${o.number}</strong>${esc(o.desc)}<div class="a-muted">${esc(o.vessel)}</div></button>`).join('');
+const placeButtons = (s, a) => `<div class="a-row">
+  <button type="button" class="a-opt${s.place === 'board' ? ' sel' : ''}${s.ot && !s.place ? ' pulse' : ''}" data-act="place" data-v="board">⚓ <strong style="display:inline">${esc(a.board)}</strong></button>
+  <button type="button" class="a-opt${s.place === 'workshop' ? ' sel' : ''}${s.ot && !s.place ? ' pulse' : ''}" data-act="place" data-v="workshop">🔧 <strong style="display:inline">${esc(a.workshop)}</strong></button></div>`;
+
+const workingCard = (s, a) => `
+  <div class="a-card center working">
+    <div class="a-muted">${esc(a.workingOn)}</div>
+    <div class="a-big">${s.ot.number}</div>
+    <div>${esc(s.ot.desc)}</div>
+    <div><span class="a-badge">${s.place === 'workshop' ? '🔧 ' + esc(a.workshop) : '⚓ ' + esc(a.board)}</span></div>
+    <div class="a-muted">${esc(a.since)} ${new Date(s.start).toLocaleTimeString(state.lang, { hour: '2-digit', minute: '2-digit' })}</div>
+    <div class="a-timer" id="sim-timer">${clockText(Date.now() - s.start)}</div>
+    <button type="button" class="a-btn outb pulse" data-act="out">⏹ ${esc(a.out)}</button>
+  </div>`;
+
+const mobileScreen = (s, a) => {
+  if (s.screen === 'working') return `${appBar(a)}<div class="app-body">${workingCard(s, a)}</div>`;
+  if (s.screen === 'finished') {
+    return `${appBar(a)}<div class="app-body"><div class="a-card center"><div class="a-big">${esc(a.hello)}, Ivan</div><div class="a-muted">${esc(a.notWorking)}</div></div>
+      <div class="a-card"><div class="a-h">${esc(a.mine)}</div><div class="a-entry"><span>${s.ot.number} · ${s.place === 'workshop' ? esc(a.workshop) : esc(a.board)}</span><span class="a-badge a">${esc(a.pending)}</span></div></div></div>`;
+  }
+  return `${appBar(a)}<div class="app-body"><div class="a-card">
+      <div class="a-big" style="text-align:center">${esc(a.hello)}, Ivan</div>
+      <div class="a-muted" style="text-align:center">${esc(a.notWorking)}</div>
+      <div class="a-h">${esc(a.selectOt)}</div>${otList(s)}
+      <div class="a-h">${esc(a.place)}</div>${placeButtons(s, a)}
+      <input class="a-input" placeholder="${esc(a.note)}" aria-label="${esc(a.note)}">
+      <button type="button" class="a-btn in${s.ot && s.place ? ' pulse' : ''}" data-act="in" ${s.ot && s.place ? '' : 'disabled'}>▶ ${esc(a.in)}</button>
+    </div></div>`;
+};
+
+const dialogHtml = (s, a) => {
+  if (!s.dialog) return '';
+  const text = s.dialog === 'in' ? `${a.confirmIn.replace('{ot}', s.ot.number)}<br>${s.place === 'workshop' ? a.workshop : a.board}` : a.confirmOut;
+  return `<div class="a-dialog"><div class="box"><div>${text}</div>
+    <div class="a-row"><button type="button" class="a-btn" data-act="cancel">${esc(a.cancel)}</button><button type="button" class="a-btn primary pulse" data-act="ok">OK</button></div></div></div>`;
+};
+
+const largeScreen = (s, a) => {
+  if (s.screen === 'login') return loginScreen(s, a);
+  if (s.screen === 'done') {
+    return `${appBar(a)}<div class="a-done ${s.doneOut ? 'out' : ''}"><div><div class="a-check">✓</div>
+      <div class="a-big">${esc(s.doneOut ? a.doneOut : a.doneIn)}</div><div class="a-timer">${s.doneAt}</div>
+      <div><strong>Ivan Petrov</strong></div><div class="a-muted">${s.ot.number} · ${esc(s.ot.desc)}</div>
+      <div class="a-muted" style="margin-top:8px">${esc(a.auto)}</div></div></div>`;
+  }
+  if (s.working) {
+    return `${appBar(a)}<div class="app-body"><div class="a-card center working">
+      <div class="a-muted">${esc(a.workingOn)}</div><div class="a-big">${s.ot.number}</div><div>${esc(s.ot.desc)}</div>
+      <div class="a-timer" id="sim-timer">${clockText(Date.now() - s.start)}</div>
+      <button type="button" class="a-btn outb pulse" data-act="largeOut">⏹ ${esc(a.out)}</button></div></div>`;
+  }
+  return `${appBar(a)}<div class="app-body"><div class="a-card">
+      <div class="a-h">${esc(a.selectOt)}</div>${otList(s)}
+      <div class="a-h">${esc(a.place)}</div>${placeButtons(s, a)}
+      <button type="button" class="a-btn in${s.ot && s.place ? ' pulse' : ''}" data-act="largeIn" ${s.ot && s.place ? '' : 'disabled'}>▶ ${esc(a.in)}</button>
+    </div></div>`;
+};
+
+const recordsScreen = (a) => {
+  const rows = [
+    [a.today, '2362', a.board, '07:30 – …', a.progress, 'g', 'recProgress'],
+    ['14/10', '2362', a.board, '07:30 – 16:00', a.pending, 'a', 'recPending'],
+    ['13/10', '2370', a.workshop, '07:30 – 15:30', a.pending, 'a', 'recPending'],
+    ['10/10', '2370', a.workshop, '07:30 – 16:30', '✓ ' + a.verified, 'g', 'recVerified'],
+  ];
+  return `${appBar(a)}<div class="app-body">
+    <div class="a-stats"><div class="a-stat"><b>3.5</b><div class="a-muted">${esc(a.hours)} · ${esc(a.today)}</div></div>
+      <div class="a-stat"><b>27.5</b><div class="a-muted">${esc(a.hours)} · ${esc(a.week)}</div></div></div>
+    <div class="a-card"><div class="a-h">${esc(a.mine)} <span class="a-muted">· ${esc(a.last)}</span></div>
+      <div class="a-list">${rows.map((r) => `<div class="a-entry"><div><strong>${esc(r[0])}</strong> · ${r[1]}<div class="a-muted">${esc(r[2])} · ${r[3]}</div></div>
+        <div><button type="button" class="a-badge ${r[5]}" style="border:0;cursor:pointer" data-act="badge" data-v="${r[6]}">${esc(r[4])}</button></div></div>`).join('')}</div>
+      <button type="button" class="a-btn" style="font-size:0.9em;padding:8px">${esc(a.pwd)}</button></div>
+  </div>`;
+};
+
+const coachFor = (s) => {
+  const k = C().coach;
+  if (s.coach) return s.coach;
+  if (s.kind === 'login') return s.screen === 'login' ? (s.tried.includes('mobile') ? k.loginLarge : k.login) : null;
+  if (s.kind === 'records') return k.records;
+  if (s.kind === 'large') {
+    if (s.screen === 'login') return s.working ? k.largeBack : k.largeLogin;
+    if (s.screen === 'done') return s.doneOut ? k.largeDoneOut : k.largeDoneIn;
+    return s.working ? k.largeOut : k.largeIn;
+  }
+  if (s.dialog) return s.dialog === 'in' ? k.confirm : k.confirmOut;
+  if (s.screen === 'working') return k.working;
+  if (s.screen === 'finished') return k.finished;
+  if (!s.ot) return k.pickOt;
+  if (!s.place) return k.pickPlace;
+  return k.tapIn;
+};
+
+const renderSim = () => {
+  const host = $('#sim');
+  if (!host || !sim) return;
+  const a = APP[sim.appLang];
+  let screen;
+  if (sim.kind === 'login') {
+    if (sim.screen === 'login') screen = loginScreen(sim, a);
+    else if (sim.screen === 'mobile') screen = `${appBar(a)}<div class="app-body"><div class="a-card center"><div class="a-big">${esc(a.hello)}, Ivan</div><div class="a-muted">${esc(a.notWorking)}</div></div></div>`;
+    else screen = `${appBar(a)}<div class="app-body"><div class="a-card center"><div class="a-big">Ivan Petrov</div><div class="a-h">${esc(a.selectOt)}</div></div></div>`;
+  } else if (sim.kind === 'large') screen = largeScreen(sim, a);
+  else if (sim.kind === 'records') screen = recordsScreen(a);
+  else screen = mobileScreen(sim, a) + dialogHtml(sim, a);
+
+  const big = sim.kind === 'large';
+  const coach = coachFor(sim);
+  const ok = (sim.kind === 'login' && sim.screen !== 'login') || sim.screen === 'finished' || (sim.screen === 'done' && sim.doneOut) || sim.coach;
+  host.innerHTML = `
+    <div class="sim-caption">${esc(C().simLabel)} · ${esc(big ? C().computer : C().phone)}</div>
+    ${coach ? `<div class="coach${ok ? ' ok' : ''}" role="status"><span class="dot">${ok ? '✓' : '!'}</span><span>${esc(coach)}</span></div>` : ''}
+    <div class="${big ? 'screen-big' : 'phone'}"><div class="screen">${screen}</div></div>
+    <button type="button" class="sim-reset" data-act="reset">↺ ${esc(C().reset)}</button>`;
+  clearInterval(simTicker);
+  if ($('#sim-timer')) {
+    simTicker = setInterval(() => { const t = $('#sim-timer'); if (t) t.textContent = clockText(Date.now() - sim.start); }, 1000);
+  }
+};
+
+const simAction = (act, value) => {
+  const s = sim;
+  s.coach = null;
+  clearSimTimers();
+  switch (act) {
+    case 'reset': sim = newSim(s.kind); if (s.kind === 'login') sim.tried = s.tried; break;
+    case 'lang': s.appLang = value; break;
+    case 'mode':
+      if (s.kind === 'login') { s.tried.push(value); s.screen = value; s.coach = value === 'mobile' ? C().coach.loginDoneMobile : C().coach.loginDoneLarge; }
+      else if (s.kind === 'large') {
+        if (value !== 'large') { s.coach = C().coach.largeLogin; break; }
+        s.screen = 'worker'; s.ot = s.working ? s.ot : null; s.place = s.working ? s.place : null;
+      }
+      break;
+    case 'ot': s.ot = ORDERS.find((o) => o.id === Number(value)); break;
+    case 'place': s.place = value; break;
+    case 'in': s.dialog = 'in'; break;
+    case 'out': s.dialog = 'out'; break;
+    case 'cancel': s.dialog = null; break;
+    case 'ok':
+      if (s.dialog === 'in') { s.screen = 'working'; s.start = Date.now(); } else { s.screen = 'finished'; }
+      s.dialog = null;
+      break;
+    case 'largeIn':
+      s.working = true; s.start = Date.now(); s.screen = 'done'; s.doneOut = false; s.doneAt = nowTime();
+      simTimers.push(setTimeout(() => { s.screen = 'login'; renderSim(); }, 4000));
+      break;
+    case 'largeOut':
+      s.working = false; s.screen = 'done'; s.doneOut = true; s.doneAt = nowTime();
+      simTimers.push(setTimeout(() => { s.screen = 'login'; s.ot = null; s.place = null; s.finishedOnce = true; renderSim(); }, 4000));
+      break;
+    case 'badge': s.coach = C().coach[value]; break;
+    default: break;
+  }
+  renderSim();
+};
+
+// ── Lecciones ──
+const quizHtml = (lesson, li) => `
+  <section class="quiz" aria-labelledby="quiz-h">
+    <h3 id="quiz-h">${esc(C().check)}</h3>
+    ${lesson.quiz.map((q, qi) => {
+      const ans = state.answered[`${li}.${qi}`];
+      return `<div class="q"><div class="qtext">${esc(q.q)}</div>
+        <div class="answers">${q.a.map((text, ai) => {
+          const cls = ans?.picked?.includes(ai) ? (ai === q.c ? 'right' : 'wrong') : '';
+          return `<button type="button" class="${cls}" data-q="${qi}" data-a="${ai}" ${ans?.correct ? 'disabled' : ''}>${esc(text)}</button>`;
+        }).join('')}</div>
+        ${ans ? `<div class="feedback ${ans.correct ? 'right' : 'wrong'}" role="status">${ans.correct ? `${esc(C().right)} ${esc(q.why)}` : `${esc(C().wrong)} ${esc(C().tryAgain)}`}</div>` : ''}
+      </div>`;
+    }).join('')}
+  </section>`;
+
+const lessonComplete = (li) => {
+  const lesson = C().lessons[li];
+  return !lesson.quiz || lesson.quiz.every((_, qi) => state.answered[`${li}.${qi}`]?.correct) || state.done.has(li);
+};
+
+const render = () => {
+  clearSimTimers();
+  const c = C();
+  document.documentElement.lang = state.lang;
+  document.title = c.title;
+  $('#course-title').textContent = c.title;
+  $('#course-sub').textContent = c.sub;
+  document.querySelectorAll('.langs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === state.lang)));
+  const total = c.lessons.length;
+  $('#progress-fill').style.width = `${(state.done.size / total) * 100}%`;
+  $('#progress-label').textContent = `${state.done.size} ${c.of} ${total} ${c.done}`;
+  $('#toc').innerHTML = c.lessons.map((l, i) => `
+    <button type="button" data-go="${i}" class="${state.done.has(i) ? 'done' : ''}" ${i === state.index && !state.finished ? 'aria-current="step"' : ''}>
+      <span class="num">${state.done.has(i) ? '✓' : i + 1}</span><span>${esc(l.name)}</span></button>`).join('');
+
+  if (state.finished) {
+    $('#lesson').innerHTML = `<section class="finish"><div class="medal">✓</div><h2>${esc(c.finishTitle)}</h2><p class="prose" style="margin:0 auto">${esc(c.finishText)}</p>
+      <button type="button" class="btn" data-go="0">${esc(c.finishAgain)}</button></section>`;
+    return;
+  }
+
+  const li = state.index;
+  const lesson = c.lessons[li];
+  const isLast = li === total - 1;
+  const content = `
+    <div class="prose">${lesson.body || ''}</div>
+    ${lesson.tip ? `<div class="tip"><span class="tag">${esc(c.tip)}</span><span>${esc(lesson.tip)}</span></div>` : ''}
+    ${lesson.warn ? `<div class="tip warn"><span class="tag">${esc(c.careful)}</span><span>${esc(lesson.warn)}</span></div>` : ''}
+    ${lesson.table ? `<div class="table-wrap"><table class="info"><thead><tr>${lesson.table.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${lesson.table.rows.map((r) => `<tr><td><strong>${esc(r[0])}</strong></td><td>${esc(r[1])}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  $('#lesson').innerHTML = `
+    <div><div class="eyebrow">${esc(c.lesson)} ${li + 1} ${esc(c.of)} ${total}</div><h2>${esc(lesson.name)}</h2></div>
+    ${lesson.sim ? `<div class="split"><div style="display:flex;flex-direction:column;gap:16px">${content}</div><div class="sim-wrap" id="sim"></div></div>` : content}
+    ${lesson.quiz ? quizHtml(lesson, li) : ''}
+    <div class="lesson-nav">
+      <button type="button" class="btn" data-nav="-1" ${li === 0 ? 'disabled' : ''}>${esc(c.prev)}</button>
+      <button type="button" class="btn primary" data-nav="1" ${lessonComplete(li) ? '' : `disabled title="${esc(c.answerAll)}"`}>${esc(isLast ? c.finish : c.next)}</button>
+    </div>`;
+  if (lesson.sim) {
+    if (!sim || sim.kind !== lesson.sim) sim = newSim(lesson.sim);
+    sim.appLang = sim.appLang || state.lang;
+    renderSim();
+  }
+};
+
+const goTo = (index) => {
+  state.finished = false;
+  state.index = Math.max(0, Math.min(C().lessons.length - 1, index));
+  sim = null;
+  persist();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+document.addEventListener('click', (event) => {
+  const el = event.target.closest('button');
+  if (!el) return;
+  if (el.dataset.lang) {
+    state.lang = el.dataset.lang;
+    if (sim) sim.appLang = state.lang;
+    persist();
+    render();
+    return;
+  }
+  if (el.dataset.go !== undefined) { goTo(Number(el.dataset.go)); return; }
+  if (el.dataset.act) { simAction(el.dataset.act, el.dataset.v); return; }
+  if (el.dataset.q !== undefined) {
+    const li = state.index;
+    const qi = Number(el.dataset.q);
+    const ai = Number(el.dataset.a);
+    const key = `${li}.${qi}`;
+    const prev = state.answered[key] || { picked: [] };
+    const correct = ai === C().lessons[li].quiz[qi].c;
+    state.answered[key] = { picked: [...prev.picked, ai], correct };
+    // Se conserva el scroll para no saltar al volver a pintar.
+    const y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+    return;
+  }
+  if (el.dataset.nav) {
+    const step = Number(el.dataset.nav);
+    if (step > 0) {
+      state.done.add(state.index);
+      if (state.index === C().lessons.length - 1) { state.finished = true; persist(); render(); window.scrollTo({ top: 0 }); return; }
+    }
+    goTo(state.index + step);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
