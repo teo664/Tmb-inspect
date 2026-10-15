@@ -1,6 +1,6 @@
 # TMB Fichaje — estado del proyecto
 
-Última actualización: 14-10-2026.
+Última actualización: 15-10-2026.
 
 ## Hecho (en `main`)
 - **Aplicación base:** alta de operarios (SSPT / UNICREW), órdenes de trabajo, asignación y retirada de operarios, fichaje de entrada y salida con «A bordo / Taller», verificación de horas por TMB, festivos y registro de cambios. En 4 idiomas: ES, EN, RU y RO.
@@ -9,11 +9,17 @@
 - **Publicación en VPS** con Docker + Caddy (HTTPS): `deploy/instalar.sh`, `actualizar.sh` y `copia.sh`.
 - **Inicio de sesión con idioma y «📱 Móvil» / «🖥️ Pantalla grande»** (PR #5). La pantalla grande no guarda la sesión y la cierra sola al fichar o tras 60 s sin actividad (5 min si es un administrador). Sustituye al terminal con lista de nombres + PIN de la PR #4.
 
+## En producción
+- **Web:** https://tmbfichaje.com (dominio comprado en GoDaddy; registro A `@` → `2.29.106.188`, `www` es un CNAME al dominio).
+- **Servidor:** VPS de Hetzner «tmb-fichaje», IP `2.29.106.188`. El repositorio está en `/opt/tmb` y la instalación en `/opt/tmb/fichaje/deploy` (el dominio se configura en su `.env`).
+- **Actualizar tras un cambio en `main`:** `ssh root@2.29.106.188`, luego `cd /opt/tmb/fichaje/deploy && ./actualizar.sh`.
+
 ## Pendiente
-- **Instalar en el VPS.** Todavía no se ha hecho y la imagen Docker no se ha probado en real. Ver «Publicar en un VPS» en `README.md`.
-- **Tras instalar:**
-  - Dar de alta los festivos.
-  - Completar la categoría (rank) de cada operario y el IMO y la bandera de cada OT.
+- Cambiar la contraseña del administrador si aún no se ha hecho (Operarios → Editar).
+- Dar de alta los festivos: 8 y 25 de diciembre de 2026, los locales de Las Palmas y el calendario 2027 del BOC.
+- Dar de alta los operarios con su categoría (rank), documento y empresa.
+- Crear las OT con IMO y bandera, asignar operarios y marcar el capataz.
+- Hacer un fichaje real de prueba en el móvil y en un ordenador táctil.
 
 ## Decisiones tomadas (confirmar si cambian)
 - **Normal / Overtime:** las 8 primeras horas del día son Normal y el resto Overtime.
