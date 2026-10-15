@@ -1,5 +1,6 @@
 // TMB Fichaje — aplicación cliente
 const TOKEN_KEY = 'tmb_fichaje_token';
+const LAST_MODE_KEY = 'tmb_fichaje_last_mode';
 // mode: 'mobile' (sesión guardada en el equipo) o 'large' (pantalla grande compartida, sin guardar).
 const state = { token: null, user: null, mode: null, companies: [], timer: null };
 
@@ -167,6 +168,7 @@ const render = () => {
   nav.hidden = state.user?.role !== 'admin';
   if (!state.user) return renderLogin();
   if (state.user.role !== 'admin') return state.mode === 'large' ? run(renderLargeWorker) : renderWorker();
+  if (state.mode === 'large') armLargeIdle();
 
   const route = currentRoute();
   nav.innerHTML = ADMIN_VIEWS
@@ -200,10 +202,10 @@ const renderLogin = () => {
         <input id="login-pass" name="password" type="password" autocomplete="current-password" required></div>
       <label>${tr('view_question')}</label>
       <div class="mode-choice">
-        <button class="mode-option" name="mode" value="mobile">
+        <button type="button" class="mode-option" data-mode="mobile">
           <span class="mode-icon">📱</span><strong>${tr('mode_mobile')}</strong><span class="muted">${tr('mode_mobile_hint')}</span>
         </button>
-        <button class="mode-option" name="mode" value="large">
+        <button type="button" class="mode-option" data-mode="large">
           <span class="mode-icon">🖥️</span><strong>${tr('mode_large')}</strong><span class="muted">${tr('mode_large_hint')}</span>
         </button>
       </div>
@@ -219,17 +221,36 @@ const renderLogin = () => {
       $('#login-pass').value = typed.pass;
     };
   });
-  $('#login-form').onsubmit = (event) => {
+  // Los botones de modo envían el formulario. Con «Intro» se usa el último modo elegido en este
+  // equipo y, si no hay ninguno, la pantalla grande, que no deja la sesión guardada.
+  const form = $('#login-form');
+  let mode = null;
+  $$('.mode-option').forEach((button) => {
+    button.onclick = () => {
+      mode = button.dataset.mode;
+      form.requestSubmit();
+    };
+  });
+  $$('#login-user, #login-pass').forEach((input) => {
+    input.onkeydown = (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      mode = storage.get(LAST_MODE_KEY) === 'mobile' ? 'mobile' : 'large';
+      form.requestSubmit();
+    };
+  });
+  form.onsubmit = (event) => {
     event.preventDefault();
     const data = new FormData(event.target);
-    const mode = event.submitter?.value === 'large' ? 'large' : 'mobile';
+    const loginMode = mode === 'mobile' ? 'mobile' : 'large';
     run(async () => {
       const result = await api('POST', '/login', { username: data.get('username'), password: data.get('password') });
       state.token = result.token;
       state.user = result.user;
-      state.mode = mode;
+      state.mode = loginMode;
+      storage.set(LAST_MODE_KEY, loginMode);
       // En la pantalla grande compartida la sesión no se guarda: al recargar o salir, vuelve el inicio.
-      if (mode === 'mobile') storage.set(TOKEN_KEY, result.token);
+      if (loginMode === 'mobile') storage.set(TOKEN_KEY, result.token);
       const chosenLang = chosenLangOnLogin;
       chosenLangOnLogin = null;
       if (chosenLang && chosenLang !== result.user.lang) {

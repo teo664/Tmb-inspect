@@ -3,6 +3,7 @@
 // en el equipo y se cierra sola al fichar o tras un rato sin tocar la pantalla.
 
 const LARGE_IDLE_MS = 60000;
+const LARGE_ADMIN_IDLE_MS = 5 * 60000;
 const LARGE_DONE_MS = 4000;
 
 const large = { idleTimer: null, clockTimer: null };
@@ -12,14 +13,17 @@ const stopLargeTimers = () => {
   clearInterval(large.clockTimer);
 };
 
-const armLargeIdle = (ms = LARGE_IDLE_MS) => {
+// En la pantalla grande también el administrador sale solo, con más margen que el operario.
+const largeIdleMs = () => (state.user?.role === 'admin' ? LARGE_ADMIN_IDLE_MS : LARGE_IDLE_MS);
+
+const armLargeIdle = (ms = largeIdleMs()) => {
   clearTimeout(large.idleTimer);
   large.idleTimer = setTimeout(signOut, ms);
 };
 
 // Cualquier toque o tecla en la vista grande reinicia la cuenta atrás de inactividad.
 const keepLargeAlive = () => {
-  if (state.mode === 'large' && state.user?.role === 'worker' && !$('.large-done')) armLargeIdle();
+  if (state.mode === 'large' && state.user && !$('.large-done')) armLargeIdle();
 };
 
 const largeClock = () => new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
@@ -28,6 +32,8 @@ const largeLogoutButton = () => `<button type="button" class="btn btn-huge large
 
 const renderLargeWorker = async () => {
   stopLargeTimers();
+  // La cuenta atrás empieza antes de cargar: si la carga falla, la sesión se cierra igualmente.
+  armLargeIdle();
   const [{ open }, workOrders] = await Promise.all([api('GET', '/my/status'), api('GET', '/my/work-orders')]);
   const head = `
     <div class="large-head">

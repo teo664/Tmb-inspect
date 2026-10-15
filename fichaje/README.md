@@ -28,7 +28,9 @@ contraseña y pulsa cómo quiere ver la aplicación:
   salida, o tras 60 segundos sin tocar la pantalla. Así el siguiente operario siempre encuentra la
   pantalla de inicio de sesión.
 
-El idioma elegido al entrar se guarda en la ficha del operario.
+El idioma elegido al entrar se guarda en la ficha del operario. Si se pulsa «Intro» en lugar de un
+botón, se usa el último modo elegido en ese equipo (o «Pantalla grande» si es la primera vez). Un
+administrador que entra en «Pantalla grande» ve su panel normal y sale solo tras 5 minutos sin actividad.
 
 ### Administrador TMB
 - **Operarios**: alta de usuarios (nombre, DNI/NIE/pasaporte, categoría, empresa SSPT/UNICREW,

@@ -7,9 +7,9 @@
 - **Time sheet de cliente** con el formato oficial de TMB (`WO_2362.1`): On board / Workshop × Normal / Overtime / Holiday / Night, redondeado a horas enteras y con capataz por OT.
 - **Hojas mensuales para las subcontratas** con sus formatos oficiales: SSPT «Time Sheet» y UNICREW «Attendance Timesheet». Solo incluyen fichajes verificados.
 - **Publicación en VPS** con Docker + Caddy (HTTPS): `deploy/instalar.sh`, `actualizar.sh` y `copia.sh`.
+- **Inicio de sesión con idioma y «📱 Móvil» / «🖥️ Pantalla grande»** (PR #5). La pantalla grande no guarda la sesión y la cierra sola al fichar o tras 60 s sin actividad (5 min si es un administrador). Sustituye al terminal con lista de nombres + PIN de la PR #4.
 
 ## Pendiente
-- **PR #5** (rama `feature/modo-pantalla-grande`): al iniciar sesión el operario elige idioma y «📱 Móvil» o «🖥️ Pantalla grande». La pantalla grande cierra la sesión sola al fichar o tras 60 s sin actividad. Sustituye al terminal con lista de nombres + PIN de la PR #4. **Falta revisarla y fusionarla.**
 - **Instalar en el VPS.** Todavía no se ha hecho y la imagen Docker no se ha probado en real. Ver «Publicar en un VPS» en `README.md`.
 - **Tras instalar:**
   - Dar de alta los festivos.
@@ -25,7 +25,6 @@
 ```bash
 git clone https://github.com/teo664/Tmb-inspect.git
 cd Tmb-inspect/fichaje
-git checkout feature/modo-pantalla-grande   # o main, si la PR #5 ya está fusionada
 npm install
 ADMIN_PASSWORD='admin123' npm start          # http://localhost:3100
 npm test                                     # 11 tests
