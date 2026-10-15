@@ -8,6 +8,8 @@
 - **Hojas mensuales para las subcontratas** con sus formatos oficiales: SSPT «Time Sheet» y UNICREW «Attendance Timesheet». Solo incluyen fichajes verificados.
 - **Publicación en VPS** con Docker + Caddy (HTTPS): `deploy/instalar.sh`, `actualizar.sh` y `copia.sh`.
 - **Inicio de sesión con idioma y «📱 Móvil» / «🖥️ Pantalla grande»** (PR #5). La pantalla grande no guarda la sesión y la cierra sola al fichar o tras 60 s sin actividad (5 min si es un administrador). Sustituye al terminal con lista de nombres + PIN de la PR #4.
+- **Encargados / ingenieros TMB** (rol `supervisor`): ven el Panel y los Fichajes y pueden validar o rechazar horas con un motivo. No cambian datos. Al operario le sale un aviso rojo con el motivo la próxima vez que entra (móvil o pantalla grande). Los fichajes rechazados no cuentan en ningún informe.
+- **Cursos interactivos:** `/curso/operarios.html` (EN/RO/RU) y `/curso/tmb.html` (ES).
 
 ## En producción
 - **Web:** https://tmbfichaje.com (dominio comprado en GoDaddy; registro A `@` → `2.29.106.188`, `www` es un CNAME al dominio).

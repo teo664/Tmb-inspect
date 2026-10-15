@@ -170,6 +170,19 @@ const T = {
   auto_logout: ['Se cerrará la sesión automáticamente', 'You will be signed out automatically', 'Сессия закроется автоматически', 'Sesiunea se va închide automat'],
   course_link: ['📘 Curso: cómo usar la app', '📘 Course: how to use the app', '📘 Курс: как пользоваться приложением', '📘 Curs: cum se folosește aplicația'],
 
+  // Encargados y rechazo de fichajes
+  role_supervisor: ['Encargado / Ingeniero TMB', 'TMB supervisor / engineer', 'Мастер / инженер TMB', 'Responsabil / inginer TMB'],
+  status_rejected: ['Rechazado', 'Rejected', 'Отклонено', 'Respins'],
+  reject_selected: ['Rechazar seleccionados', 'Reject selected', 'Отклонить выбранные', 'Respinge selecția'],
+  reject_title: ['Rechazar fichajes', 'Reject records', 'Отклонить отметки', 'Respinge pontaje'],
+  reject_reason: ['Motivo del rechazo (lo verá el operario)', 'Reason for rejection (the worker will see it)', 'Причина отклонения (работник её увидит)', 'Motivul respingerii (muncitorul îl va vedea)'],
+  reason: ['Motivo', 'Reason', 'Причина', 'Motiv'],
+  rejected_by: ['Rechazado por', 'Rejected by', 'Отклонил', 'Respins de'],
+  notice_title: ['Fichajes rechazados', 'Rejected time records', 'Отклонённые отметки', 'Pontaje respinse'],
+  notice_text: ['TMB ha revisado estos fichajes y no son correctos. Habla con tu encargado para corregirlos.', 'TMB checked these records and they are not correct. Talk to your supervisor to correct them.', 'TMB проверил эти отметки, и они неверны. Обратитесь к мастеру, чтобы их исправить.', 'TMB a verificat aceste pontaje și nu sunt corecte. Vorbiți cu responsabilul pentru a le corecta.'],
+  notice_ok: ['Entendido', 'Understood', 'Понятно', 'Am înțeles'],
+  err_reason_required: ['Escribe el motivo del rechazo', 'Write the reason for the rejection', 'Укажите причину отклонения', 'Scrieți motivul respingerii'],
+
   // Errores
   err_unauthorized: ['Sesión caducada. Vuelve a entrar.', 'Session expired. Please sign in again.', 'Сессия истекла. Войдите снова.', 'Sesiunea a expirat. Autentificați-vă din nou.'],
   err_invalid_credentials: ['Usuario o contraseña incorrectos', 'Wrong username or password', 'Неверный логин или пароль', 'Utilizator sau parolă greșită'],

@@ -124,7 +124,12 @@ const LESSONS = [
         <li><strong>Nombre y apellidos</strong> y <strong>DNI / NIE / Pasaporte</strong>.</li>
         <li><strong>Categoría (Rank)</strong>: Welder, Pipefitter… Sale en las hojas de la subcontrata.</li>
         <li><strong>Empresa</strong>: SSPT, UNICREW o TMB.</li>
-        <li><strong>Rol</strong>: «Operario» o «Administrador TMB».</li>
+        <li><strong>Rol</strong>:
+          <ul>
+            <li><strong>Operario</strong>: ficha sus horas.</li>
+            <li><strong>Encargado / Ingeniero TMB</strong>: ve el Panel y los Fichajes, y valida o rechaza horas. No puede cambiar datos.</li>
+            <li><strong>Administrador TMB</strong>: puede hacerlo todo.</li>
+          </ul></li>
         <li><strong>Idioma</strong> en el que verá la app, y una <strong>contraseña</strong> de al menos 4 caracteres.</li>
       </ul>
       <p><strong>Editar</strong> permite cambiar los datos. Si dejas la contraseña vacía, no se cambia. Así se da una contraseña nueva a quien la olvide.</p>
@@ -164,6 +169,9 @@ const LESSONS = [
         <li>Pulsa <strong>✓ Verificar seleccionados</strong>.</li>
       </ol>
       <p>Los fichajes <strong>en curso</strong> no tienen casilla: se verifican cuando el operario ficha la salida.</p>
+      <h3>Rechazar</h3>
+      <p>Si unas horas no son correctas, márcalas y pulsa <strong>✕ Rechazar seleccionados</strong>. Escribe el motivo: el operario lo verá en un aviso rojo la próxima vez que entre en la app. Escríbelo corto y claro, mejor en inglés si el operario no habla castellano.</p>
+      <p>Las horas rechazadas no salen en ningún informe. El administrador las corrige con <strong>Editar</strong> (vuelven a pendiente) o las elimina.</p>
       <h3>Corregir</h3>
       <ul>
         <li><strong>Editar</strong>: cambia OT, lugar, entrada o salida. Si cambias horas u OT, el fichaje vuelve a quedar pendiente.</li>
@@ -175,6 +183,7 @@ const LESSONS = [
     sim: 'verify',
     quiz: [
       { q: 'Corriges la hora de salida de un fichaje ya verificado. ¿Qué pasa?', a: ['Sigue verificado', 'Vuelve a quedar pendiente y hay que verificarlo otra vez', 'Se elimina'], c: 1, why: 'Cambiar horas u OT anula la verificación, para que nadie apruebe un dato sin revisarlo.' },
+      { q: 'Un encargado ve que un operario fichó «A bordo» cuando estuvo en el taller. ¿Qué hace?', a: ['Verificarlo igualmente', 'Rechazarlo explicando el motivo', 'Eliminarlo'], c: 1, why: 'El rechazo avisa al operario con el motivo y el fichaje no cuenta hasta que el administrador lo corrija.' },
       { q: 'Un operario fichó la entrada ayer y no la salida. ¿Cómo lo arreglas?', a: ['Editar el fichaje en curso y poner la hora de salida', 'Eliminarlo', 'Pedirle que fiche la salida hoy'], c: 0, why: 'Si ficha la salida hoy, el fichaje sumaría horas que no trabajó.' },
     ],
   },

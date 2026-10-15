@@ -137,3 +137,52 @@ test('capataz por OT y festivos', async () => {
   await call('DELETE', '/api/holidays/2026-10-12', { token: admin });
   assert.equal((await call('GET', '/api/holidays', { token: admin })).body.length, 0);
 });
+
+test('el encargado valida o rechaza fichajes y el operario recibe el aviso', async () => {
+  const admin = await login('admin', 'secret');
+  const companies = (await call('GET', '/api/companies', { token: admin })).body;
+  const tmb = companies.find((c) => c.code === 'TMB');
+  const sspt = companies.find((c) => c.code === 'SSPT');
+  const boss = await call('POST', '/api/users', {
+    token: admin, body: { username: 'jefe', full_name: 'Juan Encargado', password: 'boss1', company_id: tmb.id, role: 'supervisor' },
+  });
+  assert.equal(boss.status, 201);
+  assert.equal(boss.body.role, 'supervisor');
+  const worker = (await call('POST', '/api/users', {
+    token: admin, body: { username: 'sergei', full_name: 'Sergei Volkov', password: '4321', company_id: sspt.id, lang: 'ru' },
+  })).body;
+  const ot = (await call('POST', '/api/work-orders', { token: admin, body: { ot_number: 'OT-REJ', description: 'Pintura' } })).body;
+  const [first, second] = await Promise.all(['2026-10-13', '2026-10-14'].map(async (day) => (await call('POST', '/api/entries', {
+    token: admin,
+    body: { user_id: worker.id, work_order_id: ot.id, start_at: `${day}T07:00:00Z`, end_at: `${day}T15:00:00Z`, place: 'board' },
+  })).body));
+
+  const jefe = await login('jefe', 'boss1');
+  // Puede consultar y validar, pero no cambiar datos ni gestionar usuarios.
+  assert.equal((await call('GET', `/api/entries?work_order_id=${ot.id}`, { token: jefe })).body.length, 2);
+  assert.equal((await call('GET', '/api/users', { token: jefe })).status, 200);
+  assert.equal((await call('POST', '/api/users', { token: jefe, body: { username: 'x', full_name: 'X', password: '1234', company_id: sspt.id } })).status, 403);
+  assert.equal((await call('PUT', `/api/entries/${first.id}`, { token: jefe, body: { end_at: '2026-10-13T16:00:00Z' } })).status, 403);
+  assert.equal((await call('DELETE', `/api/entries/${first.id}`, { token: jefe })).status, 403);
+  assert.equal((await call('GET', '/api/audit', { token: jefe })).status, 403);
+
+  assert.equal((await call('POST', '/api/entries/reject', { token: jefe, body: { ids: [second.id], reason: ' ' } })).body.error, 'reason_required');
+  assert.equal((await call('POST', '/api/entries/verify', { token: jefe, body: { ids: [first.id] } })).body.updated, 1);
+  assert.equal((await call('POST', '/api/entries/reject', { token: jefe, body: { ids: [second.id], reason: 'Ese día estuvo en el taller' } })).body.updated, 1);
+
+  const rejected = (await call('GET', `/api/entries?status=rejected&work_order_id=${ot.id}`, { token: admin })).body;
+  assert.equal(rejected.length, 1);
+  assert.equal(rejected[0].review_note, 'Ese día estuvo en el taller');
+  assert.equal(rejected[0].verified_by_name, 'Juan Encargado');
+
+  const sergei = await login('sergei', '4321');
+  const notices = (await call('GET', '/api/my/notices', { token: sergei })).body;
+  assert.deepEqual(notices.map((n) => [n.id, n.review_note]), [[second.id, 'Ese día estuvo en el taller']]);
+  await call('POST', '/api/my/notices/ack', { token: sergei });
+  assert.equal((await call('GET', '/api/my/notices', { token: sergei })).body.length, 0);
+  assert.equal((await call('GET', '/api/entries/reject', { token: sergei })).status, 403);
+
+  // El administrador corrige el fichaje rechazado: vuelve a quedar pendiente.
+  const fixed = await call('PUT', `/api/entries/${second.id}`, { token: admin, body: { place: 'workshop' } });
+  assert.equal(fixed.body.status, 'pending');
+});

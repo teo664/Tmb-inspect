@@ -13,8 +13,8 @@ const stopLargeTimers = () => {
   clearInterval(large.clockTimer);
 };
 
-// En la pantalla grande también el administrador sale solo, con más margen que el operario.
-const largeIdleMs = () => (state.user?.role === 'admin' ? LARGE_ADMIN_IDLE_MS : LARGE_IDLE_MS);
+// En la pantalla grande también administradores y encargados salen solos, con más margen que el operario.
+const largeIdleMs = () => (isStaff() ? LARGE_ADMIN_IDLE_MS : LARGE_IDLE_MS);
 
 const armLargeIdle = (ms = largeIdleMs()) => {
   clearTimeout(large.idleTimer);
@@ -34,12 +34,15 @@ const renderLargeWorker = async () => {
   stopLargeTimers();
   // La cuenta atrás empieza antes de cargar: si la carga falla, la sesión se cierra igualmente.
   armLargeIdle();
-  const [{ open }, workOrders] = await Promise.all([api('GET', '/my/status'), api('GET', '/my/work-orders')]);
+  const [{ open }, workOrders, notices] = await Promise.all([
+    api('GET', '/my/status'), api('GET', '/my/work-orders'), api('GET', '/my/notices'),
+  ]);
   const head = `
     <div class="large-head">
       <div class="large-clock" id="large-clock">${largeClock()}</div>
       <h2>${esc(state.user.full_name)}</h2>
-    </div>`;
+    </div>
+    ${noticeHtml(notices)}`;
 
   if (open) {
     $('#view').innerHTML = `<div class="large">${head}
@@ -99,6 +102,7 @@ const renderLargeWorker = async () => {
   }
 
   $('#large-exit').onclick = signOut;
+  wireNotice(() => run(renderLargeWorker));
   large.clockTimer = setInterval(() => {
     $('#large-clock').textContent = largeClock();
     const timer = $('#timer');

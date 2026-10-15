@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   doc_id TEXT NOT NULL DEFAULT '',
   rank TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'worker')),
+  role TEXT NOT NULL CHECK (role IN ('admin', 'supervisor', 'worker')),
   company_id INTEGER NOT NULL REFERENCES companies(id),
   lang TEXT NOT NULL DEFAULT 'es',
   active INTEGER NOT NULL DEFAULT 1,
@@ -61,9 +61,11 @@ CREATE TABLE IF NOT EXISTS time_entries (
   source TEXT NOT NULL DEFAULT 'clock' CHECK (source IN ('clock', 'manual')),
   place TEXT NOT NULL DEFAULT 'board' CHECK (place IN ('board', 'workshop')),
   note TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'rejected')),
   verified_by INTEGER REFERENCES users(id),
   verified_at TEXT,
+  review_note TEXT NOT NULL DEFAULT '',
+  notice_pending INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   updated_by INTEGER REFERENCES users(id)
@@ -109,7 +111,48 @@ const MIGRATIONS = [
   ['users', 'rank', "TEXT NOT NULL DEFAULT ''"],
   ['work_orders', 'imo', "TEXT NOT NULL DEFAULT ''"],
   ['work_orders', 'flag', "TEXT NOT NULL DEFAULT ''"],
+  ['time_entries', 'review_note', "TEXT NOT NULL DEFAULT ''"],
+  ['time_entries', 'notice_pending', 'INTEGER NOT NULL DEFAULT 0'],
 ];
+
+// SQLite no permite cambiar un CHECK: la tabla se rehace con el esquema actual y se copian los datos.
+// Cada fila: tabla y un texto que solo aparece en el CHECK nuevo.
+const CHECK_UPGRADES = [
+  ['users', "'supervisor'"],
+  ['time_entries', "'rejected'"],
+];
+
+const createStatement = (table) => SCHEMA.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n\\);`))[0];
+
+const rebuildTable = (db, table) => {
+  const columns = (name) => db.prepare(`PRAGMA table_info(${name})`).all().map((c) => c.name);
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    transaction(db, () => {
+      db.exec(createStatement(table).replace(`IF NOT EXISTS ${table} (`, `${table}_new (`));
+      const old = new Set(columns(table));
+      const shared = columns(`${table}_new`).filter((c) => old.has(c)).join(', ');
+      db.exec(`INSERT INTO ${table}_new (${shared}) SELECT ${shared} FROM ${table}`);
+      db.exec(`DROP TABLE ${table}`);
+      db.exec(`ALTER TABLE ${table}_new RENAME TO ${table}`);
+    });
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+};
+
+const upgradeChecks = (db) => {
+  let rebuilt = false;
+  for (const [table, marker] of CHECK_UPGRADES) {
+    const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)?.sql || '';
+    if (sql.includes('CHECK (') && sql.includes(table === 'users' ? 'role IN' : 'status IN') && !sql.includes(marker)) {
+      rebuildTable(db, table);
+      rebuilt = true;
+    }
+  }
+  // Al rehacer una tabla se pierden sus índices: se vuelven a crear.
+  if (rebuilt) db.exec(SCHEMA);
+};
 
 const migrate = (db) => {
   for (const [table, column, definition] of MIGRATIONS) {
@@ -124,6 +167,7 @@ const openDatabase = (file) => {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
   migrate(db);
+  upgradeChecks(db);
   const insertCompany = db.prepare('INSERT OR IGNORE INTO companies (code, name) VALUES (?, ?)');
   for (const [code, name] of COMPANIES) insertCompany.run(code, name);
   return db;

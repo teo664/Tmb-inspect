@@ -4,6 +4,8 @@ const express = require('express');
 const { hashPassword, verifyPassword, transaction } = require('./db');
 
 const LANGS = ['es', 'en', 'ru', 'ro'];
+const ROLES = ['admin', 'supervisor', 'worker'];
+const ENTRY_STATUSES = ['pending', 'verified', 'rejected'];
 const PLACES = ['board', 'workshop'];
 const SESSION_DAYS = 30;
 const MAX_LOGIN_FAILURES = 10;
@@ -133,7 +135,10 @@ const createApi = (db) => {
     next();
   };
 
-  const adminOnly = (req, res, next) => next(req.user.role === 'admin' ? undefined : new ApiError(403, 'forbidden'));
+  const allowRoles = (...roles) => (req, res, next) => next(roles.includes(req.user.role) ? undefined : new ApiError(403, 'forbidden'));
+  // Encargados e ingenieros de TMB: consultan y validan o rechazan fichajes, pero no cambian datos.
+  const staffOnly = allowRoles('admin', 'supervisor');
+  const adminOnly = allowRoles('admin');
 
   router.post('/login', (req, res) => {
     const username = requireText(req.body.username, 'credentials_required').toLowerCase();
@@ -233,8 +238,20 @@ const createApi = (db) => {
       .all(req.user.id, from, to).map(withMinutes));
   });
 
-  // ── Administración ──────────────────────────────────────────
-  router.use(adminOnly);
+  // Fichajes rechazados que el operario aún no ha visto.
+  router.get('/my/notices', (req, res) => {
+    res.json(db.prepare(`${ENTRY_SELECT} WHERE e.user_id = ? AND e.status = 'rejected' AND e.notice_pending = 1 ORDER BY e.start_at`)
+      .all(req.user.id).map(withMinutes));
+  });
+
+  router.post('/my/notices/ack', (req, res) => {
+    const result = db.prepare('UPDATE time_entries SET notice_pending = 0 WHERE user_id = ? AND notice_pending = 1').run(req.user.id);
+    if (result.changes) audit(req.user.id, 'entry.notice_ack', { count: Number(result.changes) });
+    res.json({ ok: true });
+  });
+
+  // ── Consulta y validación (administradores y encargados) ──
+  router.use(staffOnly);
 
   router.get('/companies', (req, res) => res.json(db.prepare('SELECT * FROM companies ORDER BY id').all()));
 
@@ -249,9 +266,76 @@ const createApi = (db) => {
     res.json(users.map((u) => ({ ...publicUser(u), active_assignments: u.active_assignments, clocked_in_ot: u.clocked_in_ot })));
   });
 
+  router.get('/work-orders', (req, res) => {
+    res.json(db.prepare(`
+      SELECT w.*,
+        (SELECT COUNT(*) FROM assignments a WHERE a.work_order_id = w.id AND a.removed_at IS NULL) AS active_assignments
+      FROM work_orders w ORDER BY w.status DESC, w.created_at DESC`).all());
+  });
+
+  router.get('/entries', (req, res) => {
+    const filters = ['1 = 1'];
+    const params = [];
+    if (req.query.from) { filters.push('e.start_at >= ?'); params.push(parseTimestamp(req.query.from, 'invalid_date')); }
+    if (req.query.to) { filters.push('e.start_at < ?'); params.push(parseTimestamp(req.query.to, 'invalid_date')); }
+    if (req.query.user_id) { filters.push('e.user_id = ?'); params.push(parseId(req.query.user_id, 'invalid_id')); }
+    if (req.query.work_order_id) { filters.push('e.work_order_id = ?'); params.push(parseId(req.query.work_order_id, 'invalid_id')); }
+    if (req.query.company_id) { filters.push('u.company_id = ?'); params.push(parseId(req.query.company_id, 'invalid_id')); }
+    if (ENTRY_STATUSES.includes(req.query.status)) { filters.push('e.status = ?'); params.push(req.query.status); }
+    if (req.query.open === '1') filters.push('e.end_at IS NULL');
+    res.json(db.prepare(`${ENTRY_SELECT} WHERE ${filters.join(' AND ')} ORDER BY e.start_at, u.full_name`)
+      .all(...params).map(withMinutes));
+  });
+
+  router.post('/entries/verify', (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map((id) => parseId(id, 'invalid_id')) : [];
+    if (!ids.length) throw new ApiError(400, 'no_entries_selected');
+    const verified = req.body.verified !== false;
+    const updated = transaction(db, () => {
+      const at = now();
+      let count = 0;
+      for (const id of ids) {
+        const result = verified
+          ? db.prepare(`UPDATE time_entries SET status = 'verified', verified_by = ?, verified_at = ?, notice_pending = 0
+              WHERE id = ? AND end_at IS NOT NULL`).run(req.user.id, at, id)
+          : db.prepare(`UPDATE time_entries SET status = 'pending', verified_by = NULL, verified_at = NULL, review_note = '', notice_pending = 0
+              WHERE id = ?`).run(id);
+        count += Number(result.changes);
+      }
+      audit(req.user.id, verified ? 'entry.verify' : 'entry.unverify', { ids });
+      return count;
+    });
+    res.json({ updated });
+  });
+
+  // Rechazar: el operario verá el motivo la próxima vez que entre en la app.
+  router.post('/entries/reject', (req, res) => {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map((id) => parseId(id, 'invalid_id')) : [];
+    if (!ids.length) throw new ApiError(400, 'no_entries_selected');
+    const reason = requireText(req.body.reason, 'reason_required');
+    const updated = transaction(db, () => {
+      const at = now();
+      let count = 0;
+      for (const id of ids) {
+        const result = db.prepare(`UPDATE time_entries SET status = 'rejected', verified_by = ?, verified_at = ?, review_note = ?, notice_pending = 1
+          WHERE id = ? AND end_at IS NOT NULL`).run(req.user.id, at, reason, id);
+        count += Number(result.changes);
+      }
+      audit(req.user.id, 'entry.reject', { ids, reason });
+      return count;
+    });
+    res.json({ updated });
+  });
+
+  router.get('/holidays', (req, res) => res.json(db.prepare('SELECT * FROM holidays ORDER BY date').all()));
+
+  // ── Administración ──────────────────────────────────────────
+  router.use(adminOnly);
+
+
   const readUserFields = (body, existing = {}) => {
     const role = body.role ?? existing.role ?? 'worker';
-    if (!['admin', 'worker'].includes(role)) throw new ApiError(400, 'invalid_role');
+    if (!ROLES.includes(role)) throw new ApiError(400, 'invalid_role');
     const companyId = parseId(body.company_id ?? existing.company_id, 'company_required');
     if (!db.prepare('SELECT 1 FROM companies WHERE id = ?').get(companyId)) throw new ApiError(400, 'company_required');
     const lang = body.lang ?? existing.lang ?? 'es';
@@ -305,13 +389,6 @@ const createApi = (db) => {
       audit(req.user.id, 'user.update', { user_id: existing.id, ...fields, active, password_reset: Boolean(req.body.password) });
     });
     res.json(publicUser(getUser(existing.id)));
-  });
-
-  router.get('/work-orders', (req, res) => {
-    res.json(db.prepare(`
-      SELECT w.*,
-        (SELECT COUNT(*) FROM assignments a WHERE a.work_order_id = w.id AND a.removed_at IS NULL) AS active_assignments
-      FROM work_orders w ORDER BY w.status DESC, w.created_at DESC`).all());
   });
 
   const readWorkOrderFields = (body, existing = {}) => {
@@ -411,20 +488,6 @@ const createApi = (db) => {
     res.json({ ok: true });
   });
 
-  router.get('/entries', (req, res) => {
-    const filters = ['1 = 1'];
-    const params = [];
-    if (req.query.from) { filters.push('e.start_at >= ?'); params.push(parseTimestamp(req.query.from, 'invalid_date')); }
-    if (req.query.to) { filters.push('e.start_at < ?'); params.push(parseTimestamp(req.query.to, 'invalid_date')); }
-    if (req.query.user_id) { filters.push('e.user_id = ?'); params.push(parseId(req.query.user_id, 'invalid_id')); }
-    if (req.query.work_order_id) { filters.push('e.work_order_id = ?'); params.push(parseId(req.query.work_order_id, 'invalid_id')); }
-    if (req.query.company_id) { filters.push('u.company_id = ?'); params.push(parseId(req.query.company_id, 'invalid_id')); }
-    if (['pending', 'verified'].includes(req.query.status)) { filters.push('e.status = ?'); params.push(req.query.status); }
-    if (req.query.open === '1') filters.push('e.end_at IS NULL');
-    res.json(db.prepare(`${ENTRY_SELECT} WHERE ${filters.join(' AND ')} ORDER BY e.start_at, u.full_name`)
-      .all(...params).map(withMinutes));
-  });
-
   const readEntryTimes = (body, existing = {}) => {
     const start = parseTimestamp(body.start_at ?? existing.start_at, 'invalid_date');
     const rawEnd = body.end_at === undefined ? existing.end_at : body.end_at;
@@ -489,28 +552,6 @@ const createApi = (db) => {
     audit(req.user.id, 'entry.delete', { entry: existing });
     res.json({ ok: true });
   });
-
-  router.post('/entries/verify', (req, res) => {
-    const ids = Array.isArray(req.body.ids) ? req.body.ids.map((id) => parseId(id, 'invalid_id')) : [];
-    if (!ids.length) throw new ApiError(400, 'no_entries_selected');
-    const verified = req.body.verified !== false;
-    const updated = transaction(db, () => {
-      const at = now();
-      let count = 0;
-      for (const id of ids) {
-        const result = verified
-          ? db.prepare("UPDATE time_entries SET status = 'verified', verified_by = ?, verified_at = ? WHERE id = ? AND end_at IS NOT NULL")
-            .run(req.user.id, at, id)
-          : db.prepare("UPDATE time_entries SET status = 'pending', verified_by = NULL, verified_at = NULL WHERE id = ?").run(id);
-        count += Number(result.changes);
-      }
-      audit(req.user.id, verified ? 'entry.verify' : 'entry.unverify', { ids });
-      return count;
-    });
-    res.json({ updated });
-  });
-
-  router.get('/holidays', (req, res) => res.json(db.prepare('SELECT * FROM holidays ORDER BY date').all()));
 
   router.post('/holidays', (req, res) => {
     const date = typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date) ? req.body.date : null;
