@@ -173,6 +173,7 @@ const COURSE = {
             <li><span class="a-badge g">In progress</span> you are clocked in right now.</li>
             <li><span class="a-badge a">Pending</span> TMB has not checked it yet.</li>
             <li><span class="a-badge g">✓ Verified</span> TMB checked it. It goes to your monthly timesheet.</li>
+            <li><span class="a-badge r">✕ Rejected</span> TMB says it is not correct. You see the reason under the record.</li>
           </ul>
           <p>You cannot change your records. If one is wrong, tell your foreman or TMB and they will correct it. All changes are logged.</p>
           <p>With <strong>Change password</strong> you can choose a new password (at least 4 characters).</p>`,
@@ -193,6 +194,7 @@ const COURSE = {
             ['“Too many attempts. Wait 15 minutes.”', 'Wait 15 minutes and try again.'],
             ['“You are already clocked in”', 'You have an open record. Clock out first.'],
             ['“No connection to the server”', 'Check Wi-Fi or mobile data and try again.'],
+            ['Red message “Rejected time records”', 'Read the reason, tap “Understood” and talk to your supervisor. Rejected hours do not count until TMB corrects them.'],
           ],
         },
         quiz: [
@@ -327,6 +329,7 @@ const COURSE = {
             <li><span class="a-badge g">În curs</span> sunteți pontat acum.</li>
             <li><span class="a-badge a">În așteptare</span> TMB nu l-a verificat încă.</li>
             <li><span class="a-badge g">✓ Verificat</span> TMB l-a verificat. Intră în fișa lunară.</li>
+            <li><span class="a-badge r">✕ Respins</span> TMB spune că nu este corect. Motivul apare sub pontaj.</li>
           </ul>
           <p>Nu puteți modifica pontajele. Dacă unul este greșit, spuneți-i șefului de echipă sau TMB și îl vor corecta. Toate modificările rămân înregistrate.</p>
           <p>Cu <strong>Schimbă parola</strong> puteți alege o parolă nouă (minim 4 caractere).</p>`,
@@ -347,6 +350,7 @@ const COURSE = {
             ['„Prea multe încercări. Așteptați 15 minute.”', 'Așteptați 15 minute și încercați din nou.'],
             ['„Aveți deja un pontaj deschis”', 'Sunteți deja pontat. Pontați mai întâi ieșirea.'],
             ['„Fără conexiune la server”', 'Verificați Wi-Fi sau datele mobile și încercați din nou.'],
+            ['Mesaj roșu „Pontaje respinse”', 'Citiți motivul, atingeți „Am înțeles” și vorbiți cu responsabilul. Orele respinse nu se numără până când TMB nu le corectează.'],
           ],
         },
         quiz: [
@@ -481,6 +485,7 @@ const COURSE = {
             <li><span class="a-badge g">В процессе</span> вы сейчас на смене.</li>
             <li><span class="a-badge a">Ожидает</span> TMB ещё не проверил её.</li>
             <li><span class="a-badge g">✓ Проверено</span> TMB проверил её. Она попадает в месячный табель.</li>
+            <li><span class="a-badge r">✕ Отклонено</span> TMB считает её неверной. Причина указана под отметкой.</li>
           </ul>
           <p>Вы не можете изменять отметки. Если отметка неверна, скажите бригадиру или в TMB, и её исправят. Все изменения записываются.</p>
           <p>Кнопка <strong>Сменить пароль</strong> позволяет задать новый пароль (не короче 4 символов).</p>`,
@@ -501,6 +506,7 @@ const COURSE = {
             ['«Слишком много попыток. Подождите 15 минут.»', 'Подождите 15 минут и попробуйте снова.'],
             ['«Смена уже начата»', 'У вас есть открытая отметка. Сначала закончите смену.'],
             ['«Нет связи с сервером»', 'Проверьте Wi-Fi или мобильный интернет и попробуйте снова.'],
+            ['Красное сообщение «Отклонённые отметки»', 'Прочитайте причину, нажмите «Понятно» и обратитесь к мастеру. Отклонённые часы не учитываются, пока TMB их не исправит.'],
           ],
         },
         quiz: [

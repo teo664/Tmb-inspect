@@ -42,9 +42,29 @@ const placeLabel = (place) => tr(place === 'workshop' ? 'place_workshop' : 'plac
 
 const statusBadge = (entry) => {
   if (!entry.end_at) return `<span class="badge badge-green">${tr('in_progress')}</span>`;
-  return entry.status === 'verified'
-    ? `<span class="badge badge-green">✓ ${tr('status_verified')}</span>`
-    : `<span class="badge badge-amber">${tr('status_pending')}</span>`;
+  if (entry.status === 'verified') return `<span class="badge badge-green">✓ ${tr('status_verified')}</span>`;
+  if (entry.status === 'rejected') return `<span class="badge badge-red">✕ ${tr('status_rejected')}</span>`;
+  return `<span class="badge badge-amber">${tr('status_pending')}</span>`;
+};
+
+const isStaff = () => ['admin', 'supervisor'].includes(state.user?.role);
+const isAdmin = () => state.user?.role === 'admin';
+
+// Aviso al operario de los fichajes que TMB ha rechazado y aún no ha visto.
+const noticeHtml = (notices) => (notices.length ? `
+  <section class="card notice-card" role="alert">
+    <h3>⚠ ${tr('notice_title')}</h3>
+    <p>${tr('notice_text')}</p>
+    <ul class="notice-list">${notices.map((e) => `<li>
+      <strong>${fmtDate(e.start_at)} · ${esc(e.ot_number)}</strong> · ${fmtTime(e.start_at)} – ${fmtTime(e.end_at)}
+      <div>${tr('reason')}: ${esc(e.review_note)}</div>
+      ${e.verified_by_name ? `<div class="muted">${tr('rejected_by')}: ${esc(e.verified_by_name)}</div>` : ''}</li>`).join('')}</ul>
+    <button type="button" class="btn btn-primary" id="btn-notice-ok">${tr('notice_ok')}</button>
+  </section>` : '');
+
+const wireNotice = (onDone) => {
+  const button = $('#btn-notice-ok');
+  if (button) button.onclick = () => run(async () => { await api('POST', '/my/notices/ack', {}); onDone(); });
 };
 
 const toast = (message, isError = false) => {
@@ -152,26 +172,29 @@ const renderHeader = () => {
 };
 
 const ADMIN_VIEWS = ['dashboard', 'workers', 'work-orders', 'entries', 'reports', 'holidays', 'audit'];
+// Los encargados solo consultan el panel y validan o rechazan fichajes.
+const SUPERVISOR_VIEWS = ['dashboard', 'entries'];
+const allowedViews = () => (isAdmin() ? ADMIN_VIEWS : SUPERVISOR_VIEWS);
 const ADMIN_LABELS = {
   dashboard: 'dashboard', workers: 'workers', 'work-orders': 'work_orders', entries: 'entries', reports: 'reports', holidays: 'holidays', audit: 'audit_log',
 };
 
 const currentRoute = () => {
   const [view = 'dashboard', id] = location.hash.replace(/^#\/?/, '').split('/');
-  return { view: ADMIN_VIEWS.includes(view) ? view : 'dashboard', id };
+  return { view: allowedViews().includes(view) ? view : 'dashboard', id };
 };
 
 const render = () => {
   clearInterval(state.timer);
   renderHeader();
   const nav = $('#admin-nav');
-  nav.hidden = state.user?.role !== 'admin';
+  nav.hidden = !isStaff();
   if (!state.user) return renderLogin();
-  if (state.user.role !== 'admin') return state.mode === 'large' ? run(renderLargeWorker) : renderWorker();
+  if (!isStaff()) return state.mode === 'large' ? run(renderLargeWorker) : renderWorker();
   if (state.mode === 'large') armLargeIdle();
 
   const route = currentRoute();
-  nav.innerHTML = ADMIN_VIEWS
+  nav.innerHTML = allowedViews()
     .map((view) => `<a href="#/${view}" class="${view === route.view ? 'current' : ''}">${tr(ADMIN_LABELS[view])}</a>`)
     .join('');
   const views = {
@@ -279,10 +302,11 @@ async (data) => {
 // ── Pantalla del operario ───────────────────────────────────
 const renderWorker = async () => {
   const from = shiftDateKey(todayKey(), -30);
-  const [{ open }, workOrders, entries] = await Promise.all([
+  const [{ open }, workOrders, entries, notices] = await Promise.all([
     api('GET', '/my/status'),
     api('GET', '/my/work-orders'),
     api('GET', `/my/entries?from=${encodeURIComponent(dayStartIso(from))}`),
+    api('GET', '/my/notices'),
   ]);
   const todayMinutes = sumMinutes(entries.filter((e) => localDateKey(e.start_at) === todayKey()));
   const weekMinutes = sumMinutes(entries.filter((e) => localDateKey(e.start_at) >= mondayKey()));
@@ -319,6 +343,7 @@ const renderWorker = async () => {
     </section>`;
 
   $('#view').innerHTML = `
+    ${noticeHtml(notices)}
     ${statusHtml}
     <div class="totals">
       <div class="stat"><div class="value">${fmtHours(todayMinutes)}</div><div class="label">${tr('hours')} · ${tr('today')}</div></div>
@@ -329,12 +354,14 @@ const renderWorker = async () => {
         <button class="btn btn-small" id="btn-password">${tr('change_password')}</button></div>
       ${entries.length ? `<ul class="entry-cards">${entries.map((e) => `<li class="entry-card">
           <div><strong>${fmtDate(e.start_at)}</strong> · ${esc(e.ot_number)}
-            <div class="muted">${placeLabel(e.place)} · ${fmtTime(e.start_at)} – ${fmtTime(e.end_at)}</div></div>
+            <div class="muted">${placeLabel(e.place)} · ${fmtTime(e.start_at)} – ${fmtTime(e.end_at)}</div>
+            ${e.status === 'rejected' && e.review_note ? `<div class="reject-note">${tr('reason')}: ${esc(e.review_note)}</div>` : ''}</div>
           <div class="entry-card-hours"><span>${fmtHours(e.minutes)} h</span>${statusBadge(e)}</div>
         </li>`).join('')}</ul>` : `<p class="muted">${tr('no_entries')}</p>`}
     </section>`;
 
   $('#btn-password').onclick = openPasswordDialog;
+  wireNotice(render);
 
   if (open) {
     state.timer = setInterval(() => { $('#timer').textContent = fmtClock(Date.now() - Date.parse(open.start_at)); }, 1000);
@@ -427,7 +454,7 @@ const userFormHtml = (user = {}) => `
     <div class="field"><label>${tr('company')}</label><select name="company_id" required>
       ${options(state.companies, user.company_id ?? state.companies.find((c) => c.code !== 'TMB')?.id, (c) => c.code)}</select></div>
     <div class="field"><label>${tr('role')}</label><select name="role">
-      ${options([{ id: 'worker' }, { id: 'admin' }], user.role ?? 'worker', (r) => tr(`role_${r.id}`))}</select></div>
+      ${options([{ id: 'worker' }, { id: 'supervisor' }, { id: 'admin' }], user.role ?? 'worker', (r) => tr(`role_${r.id}`))}</select></div>
     <div class="field"><label>${tr('language')}</label><select name="lang">
       ${options(LANGS.map((id) => ({ id })), user.lang ?? currentLang, (l) => LANG_NAMES[l.id])}</select></div>
   </div>
@@ -458,7 +485,7 @@ const renderWorkers = async () => {
       <thead><tr><th>${tr('full_name')}</th><th>${tr('username')}</th><th>${tr('company')}</th><th class="hide-mobile">${tr('doc_id')}</th>
         <th>${tr('assigned_ots')}</th><th>${tr('status')}</th><th></th></tr></thead>
       <tbody>${users.map((u) => `<tr class="${u.active ? '' : 'inactive'}" data-company="${u.company_id}">
-        <td><strong>${esc(u.full_name)}</strong>${u.role === 'admin' ? ` <span class="badge">${tr('role_admin')}</span>` : ''}</td>
+        <td><strong>${esc(u.full_name)}</strong>${u.role === 'worker' ? '' : ` <span class="badge">${tr(`role_${u.role}`)}</span>`}</td>
         <td>${esc(u.username)}</td><td>${esc(u.company_code)}</td><td class="hide-mobile">${esc(u.doc_id)}</td>
         <td>${u.role === 'worker' ? u.active_assignments : ''}
           ${u.clocked_in_ot ? `<span class="badge badge-green">${tr('clocked_in_on')} ${esc(u.clocked_in_ot)}</span>` : ''}</td>
@@ -670,7 +697,7 @@ const renderEntries = async () => {
   ]);
   const f = entryFilters;
   $('#view').innerHTML = `
-    <div class="spread"><h2>${tr('entries')}</h2><button class="btn btn-primary" id="btn-add-entry">+ ${tr('add_entry')}</button></div>
+    <div class="spread"><h2>${tr('entries')}</h2>${isAdmin() ? `<button class="btn btn-primary" id="btn-add-entry">+ ${tr('add_entry')}</button>` : ''}</div>
     <form class="card row" id="entry-filters">
       <div><label>${tr('from')}</label><input type="date" name="from" value="${f.from}" required></div>
       <div><label>${tr('to')}</label><input type="date" name="to" value="${f.to}" required></div>
@@ -679,7 +706,7 @@ const renderEntries = async () => {
         ${options(users.filter((u) => u.role === 'worker'), f.user_id, (u) => u.full_name)}</select></div>
       <div><label>${tr('ot')}</label><select name="work_order_id"><option value="">${tr('all')}</option>${options(orders, f.work_order_id, (o) => o.ot_number)}</select></div>
       <div><label>${tr('status')}</label><select name="status"><option value="">${tr('all')}</option>
-        ${options([{ id: 'pending' }, { id: 'verified' }], f.status, (s) => tr(`status_${s.id}`))}</select></div>
+        ${options([{ id: 'pending' }, { id: 'verified' }, { id: 'rejected' }], f.status, (s) => tr(`status_${s.id}`))}</select></div>
       <button class="btn btn-primary" style="flex:0 0 auto">${tr('search')}</button>
     </form>
     <section class="card">
@@ -688,6 +715,7 @@ const renderEntries = async () => {
         <div class="actions">
           <span class="muted" id="selected-count"></span>
           <button class="btn btn-small btn-primary" id="btn-verify" disabled>✓ ${tr('verify_selected')}</button>
+          <button class="btn btn-small btn-danger" id="btn-reject" disabled>✕ ${tr('reject_selected')}</button>
           <button class="btn btn-small" id="btn-unverify" disabled>${tr('unverify_selected')}</button>
         </div>
       </div>
@@ -704,9 +732,10 @@ const renderEntries = async () => {
           <td>${e.end_at ? (localDateKey(e.end_at) === localDateKey(e.start_at) ? fmtTime(e.end_at) : fmtDateTime(e.end_at)) : '—'}</td>
           <td class="num">${fmtHours(e.minutes)}</td>
           <td>${statusBadge(e)}${e.source === 'manual' ? ` <span class="badge">${tr('manual')}</span>` : ''}
-            ${e.note ? `<div class="muted">${esc(e.note)}</div>` : ''}</td>
-          <td class="actions"><button class="btn btn-small" data-edit="${e.id}">${tr('edit')}</button>
-            <button class="btn btn-small btn-danger" data-delete="${e.id}" aria-label="${tr('delete')}">✕</button></td>
+            ${e.note ? `<div class="muted">${esc(e.note)}</div>` : ''}
+            ${e.status === 'rejected' && e.review_note ? `<div class="reject-note">${tr('reason')}: ${esc(e.review_note)}${e.verified_by_name ? ` · ${esc(e.verified_by_name)}` : ''}</div>` : ''}</td>
+          <td class="actions">${isAdmin() ? `<button class="btn btn-small" data-edit="${e.id}">${tr('edit')}</button>
+            <button class="btn btn-small btn-danger" data-delete="${e.id}" aria-label="${tr('delete')}">✕</button>` : ''}</td>
         </tr>`).join('')}</tbody></table></div>` : `<p class="muted">${tr('no_entries')}</p>`}
     </section>`;
 
@@ -721,6 +750,7 @@ const renderEntries = async () => {
     const count = selectedIds().length;
     $('#selected-count').textContent = count ? `${count} ${tr('selected')}` : '';
     $('#btn-verify').disabled = !count;
+    $('#btn-reject').disabled = !count;
     $('#btn-unverify').disabled = !count;
   };
   $$('.entry-check').forEach((box) => { box.onchange = updateSelection; });
@@ -733,6 +763,20 @@ const renderEntries = async () => {
   });
   $('#btn-verify').onclick = () => setVerified(true);
   $('#btn-unverify').onclick = () => setVerified(false);
+  $('#btn-reject').onclick = () => {
+    const ids = selectedIds();
+    openDialog(tr('reject_title'), `
+      <p class="muted" style="margin-bottom:12px">${ids.length} ${tr('selected')}</p>
+      <div class="field"><label for="reject-reason">${tr('reject_reason')}</label>
+        <textarea id="reject-reason" name="reason" rows="3" required></textarea></div>`, async (data) => {
+      const reason = String(data.get('reason') || '').trim();
+      if (!reason) throw new ApiFailure(tr('err_reason_required'));
+      await api('POST', '/entries/reject', { ids, reason });
+      render();
+      return true;
+    });
+  };
+  if (!isAdmin()) return;
 
   $('#btn-add-entry').onclick = () => openDialog(tr('add_entry'), entryFormHtml({}, users, orders), async (data) => {
     await api('POST', '/entries', {
@@ -832,8 +876,10 @@ const renderReports = async () => {
       api('GET', `/entries?${entryQuery({ from: p.from, to: p.to })}`),
       api('GET', '/holidays'),
     ]);
-    const classified = classifyEntries(allEntries, new Set(holidays.map((h) => h.date)));
-    const ofOrder = allEntries.filter((e) => e.end_at && String(e.work_order_id) === p.work_order_id
+    // Los fichajes rechazados no cuentan en ningún informe.
+    const validEntries = allEntries.filter((e) => e.status !== 'rejected');
+    const classified = classifyEntries(validEntries, new Set(holidays.map((h) => h.date)));
+    const ofOrder = validEntries.filter((e) => e.end_at && String(e.work_order_id) === p.work_order_id
       && (!p.company_id || String(e.company_id) === p.company_id));
     const entries = p.only_verified ? ofOrder.filter((e) => e.status === 'verified') : ofOrder;
     const pending = ofOrder.filter((e) => e.status !== 'verified').length;

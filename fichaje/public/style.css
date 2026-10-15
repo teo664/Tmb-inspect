@@ -245,3 +245,11 @@ dialog::backdrop { background: rgba(31, 45, 61, 0.55); }
 }
 .mode-large .status-card .ot-big { font-size: 3rem; }
 .mode-large .status-card { font-size: 1.2rem; }
+
+/* ── Fichajes rechazados ─────────────── */
+.notice-card { border-left: 6px solid var(--red); display: flex; flex-direction: column; gap: 8px; }
+.notice-card h3 { color: var(--red); margin: 0; }
+.notice-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.notice-list li { background: #fbe9ec; border-radius: 8px; padding: 8px 10px; }
+.notice-card .btn { align-self: flex-start; }
+.reject-note { color: var(--red); font-size: 0.85rem; margin-top: 2px; }
