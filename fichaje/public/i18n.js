@@ -168,6 +168,7 @@ const T = {
   done_in: ['Entrada registrada', 'Clock-in recorded', 'Начало смены записано', 'Intrare înregistrată'],
   done_out: ['Salida registrada', 'Clock-out recorded', 'Окончание смены записано', 'Ieșire înregistrată'],
   auto_logout: ['Se cerrará la sesión automáticamente', 'You will be signed out automatically', 'Сессия закроется автоматически', 'Sesiunea se va închide automat'],
+  course_link: ['📘 Curso: cómo usar la app', '📘 Course: how to use the app', '📘 Курс: как пользоваться приложением', '📘 Curs: cum se folosește aplicația'],
 
   // Errores
   err_unauthorized: ['Sesión caducada. Vuelve a entrar.', 'Session expired. Please sign in again.', 'Сессия истекла. Войдите снова.', 'Sesiunea a expirat. Autentificați-vă din nou.'],

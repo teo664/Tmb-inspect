@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Curso TMB Fichaje</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="curso.css">
+<style>
+  .calc { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+  .calc-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+  .calc-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+  .calc-form input, .calc-form select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.88rem; }
+  .presets button:hover { border-color: var(--muted); }
+  .buckets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .bucket { border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .bucket .v { font-family: var(--display); font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .bucket .n { font-weight: 700; }
+  .bucket .m { font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bucket.normal { box-shadow: inset 0 3px 0 var(--green); }
+  .bucket.overtime { box-shadow: inset 0 3px 0 var(--amber); }
+  .bucket.holiday { box-shadow: inset 0 3px 0 var(--red); }
+  .bucket.night { box-shadow: inset 0 3px 0 var(--muted); }
+  .strip { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--chip); }
+  .strip span { display: block; height: 100%; }
+  .calc-note { font-size: 0.92rem; color: var(--muted); }
+  .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; counter-reset: f; }
+  .flow li { list-style: none; background: var(--surface); border-radius: 10px; padding: 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 4px; font-size: 0.92rem; min-width: 0; }
+  .flow li::before { counter-increment: f; content: counter(f); width: 24px; height: 24px; border-radius: 50%; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; }
+  .flow strong { font-family: var(--display); font-size: 1.1rem; }
+  .flow .who { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .checklist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .checklist section { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; min-width: 0; }
+  .checklist h3 { margin-bottom: 8px; }
+  .checklist label { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; cursor: pointer; }
+  .checklist input { margin-top: 5px; accent-color: var(--red); }
+  @media (max-width: 860px) { .flow, .checklist { grid-template-columns: minmax(0, 1fr); } .buckets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<header class="course-head">
+  <div class="inner">
+    <div class="brand">
+      <span class="mark">TMB</span>
+      <div><h1>Curso TMB Fichaje</h1><div class="sub">Para el equipo de TMB que administra la app</div></div>
+    </div>
+    <div class="head-tools">
+      <div class="progress"><div class="bar"><div class="fill" id="progress-fill"></div></div><div class="label" id="progress-label"></div></div>
+    </div>
+  </div>
+</header>
+<div class="layout">
+  <nav class="toc" id="toc" aria-label="Lecciones"></nav>
+  <main class="lesson" id="lesson"></main>
+</div>
+
+<script>
+// Curso interno para el equipo de TMB (solo castellano). Mismo esquema que el curso de operarios:
+// texto, simulador cuando ayuda, preguntas de repaso y progreso guardado en este navegador.
+
+const WORKERS = [
+  { id: 1, name: 'Ivan Petrov', company: 'SSPT' },
+  { id: 2, name: 'Andrei Popescu', company: 'UNICREW' },
+  { id: 3, name: 'Sergei Volkov', company: 'SSPT' },
+  { id: 4, name: 'Mihai Ionescu', company: 'UNICREW' },
+];
+
+const LESSONS = [
+  {
+    name: 'Cómo funciona',
+    body: `
+      <p>TMB Fichaje registra las horas de los operarios de <strong>SSPT</strong> y <strong>UNICREW</strong> en cada orden de trabajo (OT) y genera dos tipos de documento:</p>
+      <ul>
+        <li>El <strong>time sheet para el cliente</strong>, con el formato oficial de TMB (WO_2362.1), para llevarlo a firmar.</li>
+        <li>Las <strong>hojas mensuales por operario</strong> para cada subcontrata: «Time Sheet» de SSPT y «Attendance Timesheet» de UNICREW.</li>
+      </ul>
+      <p>Así es el ciclo completo:</p>`,
+    flow: [
+      ['TMB', 'Da de alta', 'operarios y OT'],
+      ['TMB', 'Asigna', 'operarios a cada OT y marca el capataz'],
+      ['Operario', 'Ficha', 'entrada y salida, a bordo o en taller'],
+      ['TMB', 'Verifica', 'los fichajes y corrige errores'],
+      ['TMB', 'Genera', 'time sheets e informes mensuales'],
+    ],
+    after: `<p>Solo los fichajes <strong>verificados</strong> llegan a las hojas de las subcontratas. Por eso verificar es la tarea más importante del día a día.</p>`,
+    tip: 'La app está en https://tmbfichaje.com. Los operarios la usan en el móvil o en los ordenadores táctiles de TMB.',
+    quiz: [
+      { q: '¿Qué fichajes aparecen en las hojas mensuales de las subcontratas?', a: ['Todos', 'Solo los verificados por TMB', 'Solo los del último día del mes'], c: 1, why: 'Las hojas de SSPT y UNICREW solo incluyen fichajes verificados.' },
+    ],
+  },
+  {
+    name: 'Entrar y moverse por la app',
+    body: `
+      <ol>
+        <li>Abre <span class="key">tmbfichaje.com</span>, elige idioma y escribe tu usuario y contraseña.</li>
+        <li>Pulsa <strong>📱 Móvil</strong> en tu propio ordenador o teléfono: la sesión queda abierta.</li>
+        <li>Pulsa <strong>🖥️ Pantalla grande</strong> en un ordenador compartido: la sesión no se guarda y se cierra sola tras <strong>5 minutos</strong> sin tocar nada.</li>
+      </ol>
+      <p>Como administrador ves estas pestañas:</p>
+      <ul>
+        <li><strong>Panel</strong>: quién está trabajando ahora, OT abiertas, fichajes pendientes de verificar y operarios activos.</li>
+        <li><strong>Operarios</strong>: alta, edición y baja de usuarios.</li>
+        <li><strong>Órdenes de trabajo</strong>: OT, asignaciones y capataz.</li>
+        <li><strong>Fichajes</strong>: revisar, corregir y verificar.</li>
+        <li><strong>Informes</strong>: time sheet de cliente y hojas de subcontrata.</li>
+        <li><strong>Festivos</strong>: días que cuentan como Holiday.</li>
+        <li><strong>Registro de cambios</strong>: quién cambió qué y cuándo.</li>
+      </ul>`,
+    warn: 'No compartas el usuario de administrador. Si alguien más de TMB necesita entrar, dale su propio usuario con rol «Administrador TMB».',
+    sim: 'panel',
+    quiz: [
+      { q: 'Vas a usar la app en el ordenador táctil del taller, que es compartido. ¿Qué eliges?', a: ['📱 Móvil', '🖥️ Pantalla grande'], c: 1, why: 'En un equipo compartido la sesión no debe quedarse abierta.' },
+    ],
+  },
+  {
+    name: 'Operarios',
+    body: `
+      <p>En <strong>Operarios → + Nuevo usuario</strong> rellenas:</p>
+      <ul>
+        <li><strong>Usuario</strong>: con el que entra (por ejemplo <span class="key">ivan.petrov</span>). No se puede cambiar después.</li>
+        <li><strong>Nombre y apellidos</strong> y <strong>DNI / NIE / Pasaporte</strong>.</li>
+        <li><strong>Categoría (Rank)</strong>: Welder, Pipefitter… Sale en las hojas de la subcontrata.</li>
+        <li><strong>Empresa</strong>: SSPT, UNICREW o TMB.</li>
+        <li><strong>Rol</strong>: «Operario» o «Administrador TMB».</li>
+        <li><strong>Idioma</strong> en el que verá la app, y una <strong>contraseña</strong> de al menos 4 caracteres.</li>
+      </ul>
+      <p><strong>Editar</strong> permite cambiar los datos. Si dejas la contraseña vacía, no se cambia. Así se da una contraseña nueva a quien la olvide.</p>
+      <p><strong>Dar de baja</strong> impide que entre y lo retira de todas sus OT. Su historial se conserva y se puede <strong>Reactivar</strong>.</p>
+      <p>Con el selector de empresa ves solo los operarios de SSPT o de UNICREW.</p>`,
+    tip: 'Entrega el usuario y la contraseña al operario en persona. Él puede cambiarla luego desde «Cambiar contraseña».',
+    quiz: [
+      { q: 'Un operario ha olvidado su contraseña. ¿Qué haces?', a: ['Le doy de baja y creo otro usuario', 'Editar → escribo una contraseña nueva → Guardar', 'No se puede hacer nada'], c: 1, why: 'En Editar, el campo de contraseña vacío no cambia nada; si escribes una, la sustituye.' },
+      { q: 'Un operario deja de trabajar para TMB. ¿Qué haces?', a: ['Dar de baja', 'Eliminar sus fichajes', 'Cambiarle la empresa a TMB'], c: 0, why: 'La baja le impide entrar y conserva su historial para los informes.' },
+    ],
+  },
+  {
+    name: 'Órdenes de trabajo y asignaciones',
+    body: `
+      <p>En <strong>Órdenes de trabajo → + Nueva OT</strong> indica el <strong>Nº de OT</strong> y la <strong>descripción</strong> (obligatorios), y si los tienes: cliente, buque, ubicación, <strong>Nº IMO</strong> y <strong>bandera</strong>. Estos datos salen en la cabecera del time sheet.</p>
+      <p>Al guardar se abre la ficha de la OT. Ahí:</p>
+      <ul>
+        <li><strong>Asignar operario</strong>: elige al operario, marca <strong>Capataz</strong> si lo es y pulsa <strong>Asignar</strong>. Desde ese momento ve la OT al fichar.</li>
+        <li>La casilla <strong>Capataz</strong> se puede cambiar en cualquier momento. El capataz aparece en el time sheet.</li>
+        <li><strong>Retirar</strong> quita al operario de la OT. Si estaba fichado en ella, se cierra su fichaje.</li>
+        <li><strong>Cerrar OT</strong> retira a todos los operarios. Se puede <strong>Reabrir</strong>.</li>
+        <li>El <strong>Historial</strong> muestra quién estuvo asignado y hasta cuándo.</li>
+      </ul>`,
+    sim: 'assign',
+    quiz: [
+      { q: 'Un operario dice que no ve la OT 2370 al fichar. ¿Qué falta?', a: ['Asignarlo a la OT 2370', 'Darle una contraseña nueva', 'Añadir un festivo'], c: 0, why: 'Los operarios solo ven las OT a las que están asignados.' },
+      { q: 'La OT ha terminado. ¿Qué haces?', a: ['Retirar a los operarios uno a uno y borrar la OT', 'Cerrar OT', 'Nada'], c: 1, why: '«Cerrar OT» retira a todos de una vez y la OT sigue disponible para informes.' },
+    ],
+  },
+  {
+    name: 'Revisar y verificar fichajes',
+    body: `
+      <p>En <strong>Fichajes</strong> ves por defecto los <strong>pendientes</strong> del mes en curso. Puedes filtrar por fechas, empresa, operario, OT y estado, y pulsar <strong>Buscar</strong>.</p>
+      <ol>
+        <li>Revisa que la OT, el lugar y las horas tengan sentido.</li>
+        <li>Marca las casillas de los correctos (la de la cabecera marca todos).</li>
+        <li>Pulsa <strong>✓ Verificar seleccionados</strong>.</li>
+      </ol>
+      <p>Los fichajes <strong>en curso</strong> no tienen casilla: se verifican cuando el operario ficha la salida.</p>
+      <h3>Corregir</h3>
+      <ul>
+        <li><strong>Editar</strong>: cambia OT, lugar, entrada o salida. Si cambias horas u OT, el fichaje vuelve a quedar pendiente.</li>
+        <li><strong>Se olvidó de fichar la salida</strong>: Editar el fichaje en curso y poner la hora de salida.</li>
+        <li><strong>Se olvidó de fichar</strong>: <strong>+ Añadir fichaje manual</strong>. Queda marcado como «manual».</li>
+        <li><strong>✕</strong> elimina un fichaje. Queda constancia en el registro de cambios.</li>
+        <li><strong>Anular verificación</strong> devuelve a pendiente los seleccionados.</li>
+      </ul>`,
+    sim: 'verify',
+    quiz: [
+      { q: 'Corriges la hora de salida de un fichaje ya verificado. ¿Qué pasa?', a: ['Sigue verificado', 'Vuelve a quedar pendiente y hay que verificarlo otra vez', 'Se elimina'], c: 1, why: 'Cambiar horas u OT anula la verificación, para que nadie apruebe un dato sin revisarlo.' },
+      { q: 'Un operario fichó la entrada ayer y no la salida. ¿Cómo lo arreglas?', a: ['Editar el fichaje en curso y poner la hora de salida', 'Eliminarlo', 'Pedirle que fiche la salida hoy'], c: 0, why: 'Si ficha la salida hoy, el fichaje sumaría horas que no trabajó.' },
+    ],
+  },
+  {
+    name: 'Cómo se cuentan las horas',
+    body: `
+      <p>En el time sheet del cliente cada hora va a una columna, separada en <strong>On board</strong> y <strong>Workshop</strong> según lo que eligió el operario al fichar:</p>
+      <ul>
+        <li><strong>Holiday</strong>: todo lo trabajado en sábado, domingo o festivo dado de alta.</li>
+        <li><strong>Night</strong>: en días laborables, lo trabajado entre las 22:00 y las 06:00.</li>
+        <li><strong>Normal</strong>: el resto, hasta 8 horas por operario y día (sumando a bordo y taller).</li>
+        <li><strong>Overtime</strong>: lo que pasa de esas 8 horas.</li>
+      </ul>
+      <p>El día que cuenta es el de la <strong>entrada</strong>. Cada casilla se redondea a la hora entera: desde media hora se redondea hacia arriba.</p>
+      <p>Prueba la calculadora con los ejemplos o con tus propias horas.</p>`,
+    calc: true,
+    quiz: [
+      { q: 'Un operario trabaja un martes laborable de 07:00 a 18:00. ¿Cómo se reparte?', a: ['11 Normal', '8 Normal y 3 Overtime', '8 Normal y 3 Night'], c: 1, why: 'Las 8 primeras son Normal y el resto Overtime. No hay horas entre 22:00 y 06:00.' },
+      { q: 'El 8 de diciembre no está dado de alta como festivo y alguien trabaja ese día. ¿Qué pasa?', a: ['Cuenta como Holiday igualmente', 'Cuenta como un día laborable normal', 'No se puede fichar'], c: 1, why: 'Solo cuentan como Holiday los fines de semana y los festivos dados de alta.' },
+    ],
+  },
+  {
+    name: 'Festivos',
+    body: `
+      <p>En <strong>Festivos</strong> eliges la fecha, opcionalmente un nombre, y pulsas <strong>+ Añadir festivo</strong>. Con <strong>✕</strong> se quita.</p>
+      <p>Los sábados y domingos ya cuentan solos. Hay que dar de alta los festivos <strong>nacionales, autonómicos y locales</strong> que afecten al trabajo en Las Palmas.</p>
+      <p>Dalos de alta <strong>antes</strong> de sacar los informes. Si añades uno después, vuelve a generar el time sheet de ese periodo.</p>`,
+    tip: 'Al empezar cada año, carga el calendario completo de festivos de Canarias y de Las Palmas de Gran Canaria (BOC y ayuntamiento).',
+    quiz: [
+      { q: '¿Hace falta dar de alta los domingos como festivo?', a: ['Sí, uno a uno', 'No, sábados y domingos ya cuentan como Holiday'], c: 1, why: 'La app ya trata los fines de semana como Holiday.' },
+    ],
+  },
+  {
+    name: 'Informes',
+    body: `
+      <h3>Time sheet para cliente</h3>
+      <ol>
+        <li>En <strong>Informes</strong>, elige la <strong>OT</strong> y el periodo (<strong>Desde / Hasta</strong>). Si quieres, filtra por empresa.</li>
+        <li>Deja marcado <strong>Solo fichajes verificados</strong>.</li>
+        <li>Pulsa <strong>🖨 Imprimir / PDF</strong>. Se abre el time sheet en inglés con el formato WO_2362.1, listo para imprimir o guardar como PDF y llevar a firmar.</li>
+      </ol>
+      <h3>Resumen para subcontrata</h3>
+      <ol>
+        <li>Elige la <strong>empresa</strong> (SSPT o UNICREW), el <strong>mes</strong> y, si quieres, un solo operario.</li>
+        <li>Pulsa <strong>🖨 Imprimir / PDF</strong>: sale una hoja por operario con el formato de esa subcontrata.</li>
+      </ol>
+      <p>Los dos informes avisan si quedan fichajes pendientes en el periodo. <strong>Exportar CSV</strong> descarga los mismos datos para Excel.</p>`,
+    warn: 'Si no se abre nada al pulsar «Imprimir / PDF», el navegador ha bloqueado la ventana emergente. Permite las ventanas emergentes para tmbfichaje.com y vuelve a pulsar.',
+    quiz: [
+      { q: 'Vas a sacar las hojas de UNICREW de octubre y el informe avisa de fichajes pendientes. ¿Qué haces?', a: ['Las envío igual', 'Reviso y verifico los pendientes de octubre y vuelvo a generar', 'Desmarco «Solo verificados»'], c: 1, why: 'Las hojas de subcontrata solo incluyen lo verificado. Lo pendiente faltaría en la hoja.' },
+    ],
+  },
+  {
+    name: 'Registro de cambios y rutina',
+    body: `
+      <p>El <strong>Registro de cambios</strong> guarda quién hizo cada alta, edición, asignación, verificación o borrado, y cuándo. Úsalo si alguien pregunta por qué cambió un fichaje.</p>
+      <p>Esta es la rutina recomendada. Puedes marcar las tareas para repasarlas:</p>`,
+    checklist: true,
+    quiz: [
+      { q: 'Un operario dice que su fichaje del lunes ha cambiado. ¿Dónde lo compruebas?', a: ['En el Registro de cambios', 'En Festivos', 'En el Panel'], c: 0, why: 'El registro de cambios dice quién lo modificó y cuándo.' },
+    ],
+  },
+];
+
+const ROUTINE = [
+  ['Cada día', ['Mirar en el Panel quién está trabajando ahora', 'Detectar fichajes abiertos de días anteriores (salidas olvidadas)', 'Asignar operarios a las OT nuevas']],
+  ['Cada semana', ['Verificar los fichajes pendientes', 'Corregir errores y añadir fichajes manuales', 'Cerrar las OT terminadas']],
+  ['Cada mes', ['Comprobar que los festivos del mes están dados de alta', 'Verificar todo el mes', 'Generar y enviar las hojas de SSPT y UNICREW', 'Generar los time sheets de cliente que toquen']],
+];
+
+// ── Estado ──
+const STORE_KEY = 'tmb_curso_tmb';
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } },
+  set(value) { try { localStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch { /* sin almacenamiento */ } },
+};
+const saved = store.get();
+const state = {
+  index: Number.isInteger(saved.index) ? Math.min(saved.index, LESSONS.length - 1) : 0,
+  done: new Set(saved.done || []),
+  routine: new Set(saved.routine || []),
+  answered: {},
+  finished: false,
+};
+const persist = () => store.set({ index: state.index, done: [...state.done], routine: [...state.routine] });
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ── Simuladores ──
+let sim = null;
+const newSim = (kind) => {
+  if (kind === 'assign') return { kind, assigned: [{ ...WORKERS[0], foreman: true, since: '06/10/2026' }], history: [], pick: '', foreman: false, dialog: null, coach: null };
+  if (kind === 'verify') {
+    return {
+      kind, coach: null, selected: new Set(),
+      rows: [
+        { id: 1, date: '13/10/2026', name: 'Ivan Petrov', co: 'SSPT', ot: '2362', place: 'A bordo', in: '07:30', out: '16:00', h: '8:30', status: 'pending' },
+        { id: 2, date: '13/10/2026', name: 'Andrei Popescu', co: 'UNICREW', ot: '2370', place: 'Taller', in: '07:30', out: '15:30', h: '8:00', status: 'pending' },
+        { id: 3, date: '14/10/2026', name: 'Sergei Volkov', co: 'SSPT', ot: '2362', place: 'A bordo', in: '08:00', out: '14:00', h: '6:00', status: 'pending', manual: true },
+        { id: 4, date: '14/10/2026', name: 'Mihai Ionescu', co: 'UNICREW', ot: '2370', place: 'Taller', in: '07:30', out: null, h: '—', status: 'open' },
+      ],
+    };
+  }
+  return { kind };
+};
+
+const coachFor = (s) => {
+  if (s.coach) return s.coach;
+  if (s.kind === 'assign') {
+    if (s.dialog) return 'Confirma con OK para retirarlo.';
+    if (!s.pick) return 'Elige un operario en el desplegable para asignarlo a la OT 2362.';
+    return 'Marca «Capataz» si lo es y pulsa «Asignar».';
+  }
+  if (s.kind === 'verify') {
+    if (s.rows.every((r) => r.status !== 'pending')) return 'Todos los fichajes cerrados están verificados. Mihai sigue trabajando: su fichaje se verificará cuando fiche la salida.';
+    if (!s.selected.size) return 'Marca las casillas de los fichajes correctos.';
+    return 'Pulsa «✓ Verificar seleccionados».';
+  }
+  return '';
+};
+
+const renderSim = () => {
+  const host = $('#sim');
+  if (!host || !sim) return;
+  let body = '';
+  let ok = false;
+  if (sim.kind === 'panel') {
+    body = `<div class="a-nav"><span class="cur">Panel</span><span>Operarios</span><span>Órdenes de trabajo</span><span>Fichajes</span><span>Informes</span><span>Festivos</span><span>Registro de cambios</span></div>
+      <div class="app-body">
+        <div class="a-stats"><div class="a-stat"><b>6</b><div class="a-muted">Trabajando ahora</div></div><div class="a-stat"><b>3</b><div class="a-muted">OT abiertas</div></div>
+          <div class="a-stat"><b>14</b><div class="a-muted">Pendientes de verificar →</div></div><div class="a-stat"><b>22</b><div class="a-muted">Operarios activos</div></div></div>
+        <div class="a-card"><div class="a-h">Trabajando ahora</div><table class="a-table"><thead><tr><th>Operario</th><th>Empresa</th><th>OT</th><th>Entrada</th></tr></thead><tbody>
+          <tr><td>Ivan Petrov</td><td>SSPT</td><td><b>2362</b></td><td>07:30</td></tr>
+          <tr><td>Mihai Ionescu</td><td>UNICREW</td><td><b>2370</b></td><td>07:30</td></tr>
+          <tr><td>Sergei Volkov</td><td>SSPT</td><td><b>2362</b></td><td>08:00</td></tr></tbody></table></div>
+      </div>`;
+  }
+  if (sim.kind === 'assign') {
+    const available = WORKERS.filter((w) => !sim.assigned.some((a) => a.id === w.id));
+    body = `<div class="app-body">
+      <div class="a-card"><div class="a-big">2362 <span class="a-badge g">Abierta</span></div><div>Main engine overhaul</div>
+        <div class="a-muted">Cliente: Atlantic Shipping · Buque: MV Atlantic Star · Nº IMO: 9234567 · Bandera: Malta</div></div>
+      <div class="a-card"><div class="a-h">Operarios asignados</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select class="a-input${sim.pick ? '' : ' pulse'}" style="flex:1 1 160px;width:auto" id="sim-pick" aria-label="Operario">
+            <option value="">Operario…</option>${available.map((w) => `<option value="${w.id}" ${String(w.id) === sim.pick ? 'selected' : ''}>${esc(w.name)} (${w.company})</option>`).join('')}</select>
+          <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="sim-foreman" ${sim.foreman ? 'checked' : ''}> Capataz</label>
+          <button type="button" class="a-btn primary${sim.pick ? ' pulse' : ''}" style="width:auto;padding:8px 12px" data-act="assign" ${sim.pick ? '' : 'disabled'}>Asignar</button>
+        </div>
+        <table class="a-table"><thead><tr><th>Operario</th><th>Empresa</th><th>Capataz</th><th></th></tr></thead><tbody>
+          ${sim.assigned.map((a) => `<tr><td>${esc(a.name)}</td><td>${a.company}</td><td><input type="checkbox" data-foreman="${a.id}" ${a.foreman ? 'checked' : ''} aria-label="Capataz"></td>
+            <td><button type="button" class="a-btn outb" style="padding:4px 8px;font-size:0.85em" data-act="remove" data-v="${a.id}">Retirar</button></td></tr>`).join('')}
+        </tbody></table>
+        ${sim.history.length ? `<div class="a-h">Historial</div>${sim.history.map((h) => `<div class="a-muted">${esc(h.name)} (${h.company}) — ${h.since} → retirado hoy</div>`).join('')}` : ''}
+      </div></div>
+      ${sim.dialog ? `<div class="a-dialog"><div class="box"><div>¿Retirar a ${esc(sim.dialog.name)} de la OT 2362? Si está fichado, se cerrará su fichaje.</div>
+        <div class="a-row"><button type="button" class="a-btn" data-act="cancel">Cancelar</button><button type="button" class="a-btn primary pulse" data-act="confirmRemove">OK</button></div></div></div>` : ''}`;
+  }
+  if (sim.kind === 'verify') {
+    const pending = sim.rows.filter((r) => r.status === 'pending');
+    ok = !pending.length;
+    body = `<div class="a-nav"><span>Panel</span><span>Operarios</span><span>Órdenes de trabajo</span><span class="cur">Fichajes</span><span>Informes</span></div>
+      <div class="app-body"><div class="a-card">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+          <strong>${sim.rows.length} fichajes</strong>
+          <span style="display:flex;gap:6px;align-items:center"><span class="a-muted">${sim.selected.size ? `${sim.selected.size} seleccionados` : ''}</span>
+          <button type="button" class="a-btn primary${sim.selected.size ? ' pulse' : ''}" style="width:auto;padding:6px 10px;font-size:0.85em" data-act="verify" ${sim.selected.size ? '' : 'disabled'}>✓ Verificar seleccionados</button></span>
+        </div>
+        <div style="overflow-x:auto"><table class="a-table" style="min-width:520px"><thead><tr><th><input type="checkbox" data-act="all" aria-label="Todos"></th><th>Fecha</th><th>Operario</th><th>OT</th><th>Lugar</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Estado</th><th></th></tr></thead><tbody>
+          ${sim.rows.map((r) => `<tr><td>${r.out ? `<input type="checkbox" data-row="${r.id}" ${sim.selected.has(r.id) ? 'checked' : ''} aria-label="Seleccionar">` : ''}</td>
+            <td>${r.date}</td><td>${esc(r.name)}</td><td>${r.ot}</td><td>${r.place}</td><td>${r.in}</td><td>${r.out || '—'}</td><td>${r.h}</td>
+            <td>${r.status === 'open' ? '<span class="a-badge g">En curso</span>' : r.status === 'verified' ? '<span class="a-badge g">✓ Verificado</span>' : '<span class="a-badge a">Pendiente</span>'}${r.manual ? ' <span class="a-badge">manual</span>' : ''}</td>
+            <td><button type="button" class="a-btn" style="padding:3px 8px;font-size:0.8em;width:auto" data-act="edit" data-v="${r.id}">Editar</button></td></tr>`).join('')}
+        </tbody></table></div></div></div>`;
+  }
+  const coach = coachFor(sim);
+  host.innerHTML = `
+    <div class="sim-caption">Pruébalo · Pantalla de administrador</div>
+    ${coach ? `<div class="coach${ok || sim.coachOk ? ' ok' : ''}" role="status"><span class="dot">${ok || sim.coachOk ? '✓' : '!'}</span><span>${esc(coach)}</span></div>` : ''}
+    <div class="screen-big"><div class="screen"><div class="app-bar"><span><span class="m">TMB</span> Control horario</span><span class="out">Salir</span></div>${body}</div></div>
+    ${sim.kind === 'panel' ? '' : `<button type="button" class="sim-reset" data-act="reset">↺ Empezar de nuevo</button>`}`;
+  const pick = $('#sim-pick');
+  if (pick) pick.onchange = () => { sim.pick = pick.value; sim.coach = null; renderSim(); };
+  const foreman = $('#sim-foreman');
+  if (foreman) foreman.onchange = () => { sim.foreman = foreman.checked; };
+  $$('[data-foreman]').forEach((box) => {
+    box.onchange = () => {
+      const a = sim.assigned.find((x) => x.id === Number(box.dataset.foreman));
+      a.foreman = box.checked;
+      sim.coach = `Guardado: ${a.name} ${a.foreman ? 'ahora es capataz' : 'ya no es capataz'}. El capataz aparece en el time sheet.`;
+      sim.coachOk = true;
+      renderSim();
+    };
+  });
+  $$('[data-row]').forEach((box) => {
+    box.onchange = () => {
+      const id = Number(box.dataset.row);
+      if (box.checked) sim.selected.add(id); else sim.selected.delete(id);
+      sim.coach = null;
+      renderSim();
+    };
+  });
+};
+
+const simAction = (act, value) => {
+  const s = sim;
+  s.coach = null;
+  s.coachOk = false;
+  switch (act) {
+    case 'reset': sim = newSim(s.kind); break;
+    case 'assign': {
+      const w = WORKERS.find((x) => String(x.id) === s.pick);
+      s.assigned.push({ ...w, foreman: s.foreman, since: 'hoy' });
+      s.coach = `${w.name} asignado${s.foreman ? ' como capataz' : ''}. Ya ve la OT 2362 al fichar. Prueba ahora «Retirar».`;
+      s.coachOk = true;
+      s.pick = ''; s.foreman = false;
+      break;
+    }
+    case 'remove': s.dialog = s.assigned.find((a) => a.id === Number(value)); break;
+    case 'cancel': s.dialog = null; break;
+    case 'confirmRemove':
+      s.assigned = s.assigned.filter((a) => a.id !== s.dialog.id);
+      s.history.push(s.dialog);
+      s.coach = `${s.dialog.name} retirado. Ya no ve la OT y queda en el historial.`;
+      s.coachOk = true;
+      s.dialog = null;
+      break;
+    case 'all': {
+      const closed = s.rows.filter((r) => r.out);
+      const allOn = closed.every((r) => s.selected.has(r.id));
+      closed.forEach((r) => (allOn ? s.selected.delete(r.id) : s.selected.add(r.id)));
+      break;
+    }
+    case 'verify':
+      s.rows.forEach((r) => { if (s.selected.has(r.id)) r.status = 'verified'; });
+      s.selected.clear();
+      break;
+    case 'edit': {
+      const r = s.rows.find((x) => x.id === Number(value));
+      s.coach = r.status === 'open'
+        ? 'Fichaje en curso: si el operario olvidó fichar la salida, aquí pondrías la hora de salida.'
+        : r.status === 'verified'
+          ? 'Ojo: si cambias horas u OT de un fichaje verificado, vuelve a quedar pendiente.'
+          : 'Aquí cambiarías OT, lugar, entrada o salida.';
+      s.coachOk = true;
+      break;
+    }
+    default: break;
+  }
+  renderSim();
+};
+
+// ── Calculadora de horas (misma regla que hours.js) ──
+const NORMAL_DAILY = 8 * 60;
+const classify = ({ holiday, start, end, before }) => {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let total = (eh * 60 + em) - (sh * 60 + sm);
+  if (total <= 0) total += 24 * 60;
+  const b = { normal: 0, overtime: 0, holiday: 0, night: 0 };
+  let used = Math.min(before * 60, NORMAL_DAILY);
+  const seq = [];
+  for (let i = 0; i < total; i += 1) {
+    const hour = Math.floor(((sh * 60 + sm + i) % (24 * 60)) / 60);
+    let cat;
+    if (holiday) cat = 'holiday';
+    else if (hour >= 22 || hour < 6) cat = 'night';
+    else if (used < NORMAL_DAILY) { cat = 'normal'; used += 1; }
+    else cat = 'overtime';
+    b[cat] += 1;
+    seq.push(cat);
+  }
+  return { b, total, seq };
+};
+const CAT = {
+  normal: ['Normal', 'var(--green)'], overtime: ['Overtime', 'var(--amber)'], holiday: ['Holiday', 'var(--red)'], night: ['Night', 'var(--muted)'],
+};
+const PRESETS = [
+  ['Jornada de 07:30 a 16:00', { day: 'work', start: '07:30', end: '16:00', before: 0 }],
+  ['Día largo de 07:00 a 20:00', { day: 'work', start: '07:00', end: '20:00', before: 0 }],
+  ['Tarde y noche de 18:00 a 02:00', { day: 'work', start: '18:00', end: '02:00', before: 0 }],
+  ['Sábado de 08:00 a 14:00', { day: 'holiday', start: '08:00', end: '14:00', before: 0 }],
+  ['Segundo fichaje: 15:00 a 19:00 tras 6 h', { day: 'work', start: '15:00', end: '19:00', before: 6 }],
+];
+let calcInput = { ...PRESETS[0][1] };
+const fmtMin = (m) => `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+const calcHtml = () => `
+  <section class="calc" aria-labelledby="calc-h">
+    <h3 id="calc-h">Calculadora de horas</h3>
+    <div class="presets">${PRESETS.map((p, i) => `<button type="button" data-preset="${i}">${esc(p[0])}</button>`).join('')}</div>
+    <form class="calc-form" id="calc-form">
+      <label for="c-day">Día de la entrada<select id="c-day" name="day"><option value="work">Laborable</option><option value="holiday">Sábado, domingo o festivo</option></select></label>
+      <label for="c-start">Entrada<input id="c-start" type="time" name="start" required></label>
+      <label for="c-end">Salida<input id="c-end" type="time" name="end" required></label>
+      <label for="c-before">Horas normales ya fichadas ese día<input id="c-before" type="number" name="before" min="0" max="24" step="0.5" style="width:9em"></label>
+    </form>
+    <div id="calc-out"></div>
+  </section>`;
+const renderCalc = () => {
+  const out = $('#calc-out');
+  if (!out) return;
+  const { b, total, seq } = classify({ holiday: calcInput.day === 'holiday', start: calcInput.start, end: calcInput.end, before: Number(calcInput.before) || 0 });
+  const runs = [];
+  seq.forEach((cat) => { if (runs.length && runs[runs.length - 1][0] === cat) runs[runs.length - 1][1] += 1; else runs.push([cat, 1]); });
+  out.innerHTML = `
+    <div class="strip" aria-hidden="true">${runs.map(([cat, n]) => `<span style="width:${(n / total) * 100}%;background:${CAT[cat][1]}"></span>`).join('')}</div>
+    <div class="calc-note">Total trabajado: ${fmtMin(total)}${total > 0 && calcInput.end <= calcInput.start ? ' (pasa de medianoche; cuenta el día de la entrada)' : ''}</div>
+    <div class="buckets">${Object.keys(CAT).map((cat) => `<div class="bucket ${cat}"><div class="n">${CAT[cat][0]}</div><div class="v">${Math.round(b[cat] / 60)}</div><div class="m">${fmtMin(b[cat])} reales</div></div>`).join('')}</div>
+    <div class="calc-note">Las cifras grandes son las que salen en el time sheet, redondeadas a la hora entera.</div>`;
+};
+const fillCalcForm = () => {
+  const form = $('#calc-form');
+  if (!form) return;
+  form.day.value = calcInput.day; form.start.value = calcInput.start; form.end.value = calcInput.end; form.before.value = calcInput.before;
+  form.oninput = () => {
+    if (!form.start.value || !form.end.value) return;
+    calcInput = { day: form.day.value, start: form.start.value, end: form.end.value, before: form.before.value };
+    renderCalc();
+  };
+  renderCalc();
+};
+
+// ── Lecciones ──
+const quizHtml = (lesson, li) => `
+  <section class="quiz" aria-labelledby="quiz-h">
+    <h3 id="quiz-h">Comprueba lo aprendido</h3>
+    ${lesson.quiz.map((q, qi) => {
+      const ans = state.answered[`${li}.${qi}`];
+      return `<div class="q"><div class="qtext">${esc(q.q)}</div>
+        <div class="answers">${q.a.map((text, ai) => {
+          const cls = ans?.picked?.includes(ai) ? (ai === q.c ? 'right' : 'wrong') : '';
+          return `<button type="button" class="${cls}" data-q="${qi}" data-a="${ai}" ${ans?.correct ? 'disabled' : ''}>${esc(text)}</button>`;
+        }).join('')}</div>
+        ${ans ? `<div class="feedback ${ans.correct ? 'right' : 'wrong'}" role="status">${ans.correct ? `Correcto. ${esc(q.why)}` : 'No exactamente. Prueba otra respuesta.'}</div>` : ''}
+      </div>`;
+    }).join('')}
+  </section>`;
+
+const lessonComplete = (li) => state.done.has(li) || LESSONS[li].quiz.every((_, qi) => state.answered[`${li}.${qi}`]?.correct);
+
+const render = () => {
+  const total = LESSONS.length;
+  $('#progress-fill').style.width = `${(state.done.size / total) * 100}%`;
+  $('#progress-label').textContent = `${state.done.size} de ${total} lecciones completadas`;
+  $('#toc').innerHTML = LESSONS.map((l, i) => `
+    <button type="button" data-go="${i}" class="${state.done.has(i) ? 'done' : ''}" ${i === state.index && !state.finished ? 'aria-current="step"' : ''}>
+      <span class="num">${state.done.has(i) ? '✓' : i + 1}</span><span>${esc(l.name)}</span></button>`).join('');
+
+  if (state.finished) {
+    $('#lesson').innerHTML = `<section class="finish"><div class="medal">✓</div><h2>Curso completado</h2>
+      <p class="prose" style="margin:0 auto">Ya sabes dar de alta operarios y OT, verificar fichajes y sacar los informes. Si algo no cuadra, el Registro de cambios te dirá qué pasó.</p>
+      <button type="button" class="btn" data-go="0">Repasar el curso</button></section>`;
+    return;
+  }
+
+  const li = state.index;
+  const lesson = LESSONS[li];
+  const content = `
+    <div class="prose">${lesson.body}</div>
+    ${lesson.flow ? `<ol class="flow">${lesson.flow.map(([who, verb, what]) => `<li><span class="who">${esc(who)}</span><strong>${esc(verb)}</strong><span>${esc(what)}</span></li>`).join('')}</ol>` : ''}
+    ${lesson.after ? `<div class="prose">${lesson.after}</div>` : ''}
+    ${lesson.tip ? `<div class="tip"><span class="tag">Consejo</span><span>${esc(lesson.tip)}</span></div>` : ''}
+    ${lesson.warn ? `<div class="tip warn"><span class="tag">Atención</span><span>${esc(lesson.warn)}</span></div>` : ''}`;
+  const routine = lesson.checklist ? `<div class="checklist">${ROUTINE.map(([when, tasks], wi) => `<section><h3>${esc(when)}</h3>
+    ${tasks.map((t, ti) => `<label><input type="checkbox" data-routine="${wi}.${ti}" ${state.routine.has(`${wi}.${ti}`) ? 'checked' : ''}> <span>${esc(t)}</span></label>`).join('')}</section>`).join('')}</div>` : '';
+  const wide = lesson.sim === 'verify';
+  $('#lesson').innerHTML = `
+    <div><div class="eyebrow">Lección ${li + 1} de ${total}</div><h2>${esc(lesson.name)}</h2></div>
+    ${lesson.sim && !wide ? `<div class="split"><div style="display:flex;flex-direction:column;gap:16px">${content}</div><div class="sim-wrap" id="sim"></div></div>` : content}
+    ${wide ? '<div class="sim-wrap" id="sim"></div>' : ''}
+    ${lesson.calc ? calcHtml() : ''}
+    ${routine}
+    ${quizHtml(lesson, li)}
+    <div class="lesson-nav">
+      <button type="button" class="btn" data-nav="-1" ${li === 0 ? 'disabled' : ''}>← Anterior</button>
+      <button type="button" class="btn primary" data-nav="1" ${lessonComplete(li) ? '' : 'disabled title="Responde las preguntas para continuar"'}>${li === total - 1 ? 'Terminar el curso' : 'Siguiente →'}</button>
+    </div>`;
+  if (lesson.sim) {
+    if (!sim || sim.kind !== lesson.sim) sim = newSim(lesson.sim);
+    renderSim();
+  }
+  if (lesson.calc) fillCalcForm();
+};
+
+const goTo = (index) => {
+  state.finished = false;
+  state.index = Math.max(0, Math.min(LESSONS.length - 1, index));
+  sim = null;
+  persist();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+document.addEventListener('change', (event) => {
+  const key = event.target.dataset?.routine;
+  if (!key) return;
+  if (event.target.checked) state.routine.add(key); else state.routine.delete(key);
+  persist();
+});
+
+document.addEventListener('click', (event) => {
+  const el = event.target.closest('button, input[data-act]');
+  if (!el) return;
+  if (el.dataset.go !== undefined) { goTo(Number(el.dataset.go)); return; }
+  if (el.dataset.act) { simAction(el.dataset.act, el.dataset.v); return; }
+  if (el.dataset.preset !== undefined) { calcInput = { ...PRESETS[Number(el.dataset.preset)][1] }; fillCalcForm(); return; }
+  if (el.dataset.q !== undefined) {
+    const li = state.index;
+    const qi = Number(el.dataset.q);
+    const ai = Number(el.dataset.a);
+    const key = `${li}.${qi}`;
+    const prev = state.answered[key] || { picked: [] };
+    state.answered[key] = { picked: [...prev.picked, ai], correct: ai === LESSONS[li].quiz[qi].c };
+    const y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+    return;
+  }
+  if (el.dataset.nav) {
+    const step = Number(el.dataset.nav);
+    if (step > 0) {
+      state.done.add(state.index);
+      if (state.index === LESSONS.length - 1) { state.finished = true; persist(); render(); window.scrollTo({ top: 0 }); return; }
+    }
+    goTo(state.index + step);
+  }
+});
+
+render();
+</script>
+</body>
+</html>
