@@ -1,7 +1,8 @@
 // TMB Fichaje — aplicación cliente
 const TOKEN_KEY = 'tmb_fichaje_token';
-const DEVICE_KEY = 'tmb_fichaje_device';
-const state = { token: null, user: null, companies: [], timer: null };
+const LAST_MODE_KEY = 'tmb_fichaje_last_mode';
+// mode: 'mobile' (sesión guardada en el equipo) o 'large' (pantalla grande compartida, sin guardar).
+const state = { token: null, user: null, mode: null, companies: [], timer: null };
 
 // ── Utilidades ──────────────────────────────────────────────
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -120,14 +121,17 @@ const openDialog = (title, bodyHtml, onSubmit) => {
 // ── Sesión ──────────────────────────────────────────────────
 const signOut = () => {
   if (state.token) fetch('/api/logout', { method: 'POST', headers: { authorization: `Bearer ${state.token}` } }).catch(() => {});
+  stopLargeTimers();
   state.token = null;
   state.user = null;
+  state.mode = null;
   storage.remove(TOKEN_KEY);
   render();
 };
 
 const changeLanguage = async (lang) => {
   setLang(lang);
+  if (!state.user) chosenLangOnLogin = lang;
   if (state.user) {
     const user = await run(() => api('PUT', '/me/lang', { lang }));
     if (user) state.user = user;
@@ -144,17 +148,12 @@ const renderHeader = () => {
   const logout = $('#btn-logout');
   logout.hidden = !state.user;
   logout.textContent = tr('logout');
-  // En el ordenador de fichaje el idioma se elige en pantalla y no hay sesión que cerrar.
-  const terminalMode = Boolean(loadTerminal());
-  document.body.classList.toggle('kiosk-mode', terminalMode);
-  select.hidden = terminalMode;
-  if (terminalMode) logout.hidden = true;
+  document.body.classList.toggle('mode-large', state.mode === 'large');
 };
 
-const ADMIN_VIEWS = ['dashboard', 'workers', 'work-orders', 'entries', 'reports', 'holidays', 'terminals', 'audit'];
+const ADMIN_VIEWS = ['dashboard', 'workers', 'work-orders', 'entries', 'reports', 'holidays', 'audit'];
 const ADMIN_LABELS = {
-  dashboard: 'dashboard', workers: 'workers', 'work-orders': 'work_orders', entries: 'entries', reports: 'reports',
-  holidays: 'holidays', terminals: 'terminals', audit: 'audit_log',
+  dashboard: 'dashboard', workers: 'workers', 'work-orders': 'work_orders', entries: 'entries', reports: 'reports', holidays: 'holidays', audit: 'audit_log',
 };
 
 const currentRoute = () => {
@@ -167,12 +166,9 @@ const render = () => {
   renderHeader();
   const nav = $('#admin-nav');
   nav.hidden = state.user?.role !== 'admin';
-  if (loadTerminal()) {
-    nav.hidden = true;
-    return renderKiosk();
-  }
-  if (!state.user) return storage.get(DEVICE_KEY) ? renderLogin() : renderWelcome();
-  if (state.user.role !== 'admin') return renderWorker();
+  if (!state.user) return renderLogin();
+  if (state.user.role !== 'admin') return state.mode === 'large' ? run(renderLargeWorker) : renderWorker();
+  if (state.mode === 'large') armLargeIdle();
 
   const route = currentRoute();
   nav.innerHTML = ADMIN_VIEWS
@@ -185,35 +181,9 @@ const render = () => {
     entries: renderEntries,
     reports: renderReports,
     holidays: renderHolidays,
-    terminals: renderTerminals,
     audit: renderAudit,
   };
   return run(views[route.view]);
-};
-
-// ── Primera pantalla: idioma y tipo de dispositivo ──────────
-const renderWelcome = () => {
-  $('#view').innerHTML = `
-    <div class="welcome">
-      <img src="/logo.jpg" alt="TMB" class="welcome-logo">
-      <h2>${tr('choose_language')}</h2>
-      ${kioskLangButtons()}
-      <h2>${tr('device_question')}</h2>
-      <div class="device-choice">
-        <button type="button" class="device-option" id="device-mobile">
-          <span class="device-icon">📱</span><strong>${tr('device_mobile')}</strong><span class="muted">${tr('device_mobile_desc')}</span>
-        </button>
-        <button type="button" class="device-option" id="device-terminal">
-          <span class="device-icon">🖥️</span><strong>${tr('device_terminal')}</strong><span class="muted">${tr('device_terminal_desc')}</span>
-        </button>
-      </div>
-    </div>`;
-  wireKioskLangs(render);
-  $('#device-mobile').onclick = () => {
-    storage.set(DEVICE_KEY, 'mobile');
-    render();
-  };
-  $('#device-terminal').onclick = renderTerminalSetup;
 };
 
 // ── Login ───────────────────────────────────────────────────
@@ -222,30 +192,79 @@ const renderLogin = () => {
     <form class="card login" id="login-form">
       <img src="/logo.jpg" alt="TMB">
       <h2>${tr('app_title')}</h2>
+      <label>${tr('choose_language')}</label>
+      <div class="login-langs">${LANGS.map((lang) => `
+        <button type="button" class="login-lang${lang === currentLang ? ' selected' : ''}" data-lang="${lang}">${LANG_NAMES[lang]}</button>`).join('')}
+      </div>
       <div class="field"><label for="login-user">${tr('username')}</label>
         <input id="login-user" name="username" autocomplete="username" autocapitalize="none" required></div>
       <div class="field"><label for="login-pass">${tr('password')}</label>
         <input id="login-pass" name="password" type="password" autocomplete="current-password" required></div>
-      <button class="btn btn-primary btn-huge">${tr('sign_in')}</button>
-      <button type="button" class="link-button" id="change-device">${tr('change_device')}</button>
+      <label>${tr('view_question')}</label>
+      <div class="mode-choice">
+        <button type="button" class="mode-option" data-mode="mobile">
+          <span class="mode-icon">📱</span><strong>${tr('mode_mobile')}</strong><span class="muted">${tr('mode_mobile_hint')}</span>
+        </button>
+        <button type="button" class="mode-option" data-mode="large">
+          <span class="mode-icon">🖥️</span><strong>${tr('mode_large')}</strong><span class="muted">${tr('mode_large_hint')}</span>
+        </button>
+      </div>
     </form>`;
-  $('#change-device').onclick = () => {
-    storage.remove(DEVICE_KEY);
-    render();
-  };
-  $('#login-form').onsubmit = (event) => {
+  $$('.login-lang').forEach((button) => {
+    button.onclick = () => {
+      const typed = { user: $('#login-user').value, pass: $('#login-pass').value };
+      chosenLangOnLogin = button.dataset.lang;
+      setLang(chosenLangOnLogin);
+      renderHeader();
+      renderLogin();
+      $('#login-user').value = typed.user;
+      $('#login-pass').value = typed.pass;
+    };
+  });
+  // Los botones de modo envían el formulario. Con «Intro» se usa el último modo elegido en este
+  // equipo y, si no hay ninguno, la pantalla grande, que no deja la sesión guardada.
+  const form = $('#login-form');
+  let mode = null;
+  $$('.mode-option').forEach((button) => {
+    button.onclick = () => {
+      mode = button.dataset.mode;
+      form.requestSubmit();
+    };
+  });
+  $$('#login-user, #login-pass').forEach((input) => {
+    input.onkeydown = (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      mode = storage.get(LAST_MODE_KEY) === 'mobile' ? 'mobile' : 'large';
+      form.requestSubmit();
+    };
+  });
+  form.onsubmit = (event) => {
     event.preventDefault();
     const data = new FormData(event.target);
+    const loginMode = mode === 'mobile' ? 'mobile' : 'large';
     run(async () => {
       const result = await api('POST', '/login', { username: data.get('username'), password: data.get('password') });
       state.token = result.token;
       state.user = result.user;
-      storage.set(TOKEN_KEY, result.token);
-      setLang(result.user.lang);
+      state.mode = loginMode;
+      storage.set(LAST_MODE_KEY, loginMode);
+      // En la pantalla grande compartida la sesión no se guarda: al recargar o salir, vuelve el inicio.
+      if (loginMode === 'mobile') storage.set(TOKEN_KEY, result.token);
+      const chosenLang = chosenLangOnLogin;
+      chosenLangOnLogin = null;
+      if (chosenLang && chosenLang !== result.user.lang) {
+        state.user = await api('PUT', '/me/lang', { lang: chosenLang });
+      }
+      setLang(state.user.lang);
       render();
     });
   };
 };
+
+// Idioma tocado en la pantalla de inicio de sesión: se aplica al operario al entrar.
+// Si no toca ninguno, se usa el que tiene guardado en su ficha.
+let chosenLangOnLogin = null;
 
 const openPasswordDialog = () => openDialog(tr('change_password'), `
   <div class="field"><label>${tr('current_password')}</label><input name="current" type="password" required autocomplete="current-password"></div>
@@ -411,8 +430,6 @@ const userFormHtml = (user = {}) => `
     <div class="field"><label>${tr('language')}</label><select name="lang">
       ${options(LANGS.map((id) => ({ id })), user.lang ?? currentLang, (l) => LANG_NAMES[l.id])}</select></div>
   </div>
-  <div class="field"><label>${tr('pin')}${user.id ? ` <span class="muted">— ${tr('pin_help')}</span>` : ''}</label>
-    <input name="pin" inputmode="numeric" pattern="\\d{4}" maxlength="4" autocomplete="off" placeholder="••••"></div>
   <div class="field"><label>${user.id ? tr('password_leave_blank') : tr('password')}</label>
     <input name="password" type="text" autocomplete="new-password" ${user.id ? '' : 'required'} minlength="4"></div>`;
 
@@ -425,7 +442,6 @@ const readUserForm = (data) => ({
   role: data.get('role'),
   lang: data.get('lang'),
   password: data.get('password') || undefined,
-  pin: data.get('pin') || undefined,
 });
 
 const renderWorkers = async () => {
@@ -441,8 +457,7 @@ const renderWorkers = async () => {
       <thead><tr><th>${tr('full_name')}</th><th>${tr('username')}</th><th>${tr('company')}</th><th class="hide-mobile">${tr('doc_id')}</th>
         <th>${tr('assigned_ots')}</th><th>${tr('status')}</th><th></th></tr></thead>
       <tbody>${users.map((u) => `<tr class="${u.active ? '' : 'inactive'}" data-company="${u.company_id}">
-        <td><strong>${esc(u.full_name)}</strong>${u.role === 'admin' ? ` <span class="badge">${tr('role_admin')}</span>` : ''}
-          ${u.role === 'worker' && !u.has_pin ? ` <span class="badge badge-amber">${tr('no_pin')}</span>` : ''}</td>
+        <td><strong>${esc(u.full_name)}</strong>${u.role === 'admin' ? ` <span class="badge">${tr('role_admin')}</span>` : ''}</td>
         <td>${esc(u.username)}</td><td>${esc(u.company_code)}</td><td class="hide-mobile">${esc(u.doc_id)}</td>
         <td>${u.role === 'worker' ? u.active_assignments : ''}
           ${u.clocked_in_ot ? `<span class="badge badge-green">${tr('clocked_in_on')} ${esc(u.clocked_in_ot)}</span>` : ''}</td>
@@ -880,42 +895,6 @@ const renderHolidays = async () => {
   });
 };
 
-// ── Admin: ordenadores de fichaje ───────────────────────────
-const renderTerminals = async () => {
-  const terminals = await api('GET', '/terminals');
-  $('#view').innerHTML = `
-    <div class="spread"><h2>${tr('terminals')}</h2>
-      <button class="btn btn-primary" id="btn-setup-terminal">🖥️ ${tr('setup_this_computer')}</button></div>
-    <p class="muted" style="margin-bottom:12px">${tr('terminals_desc')}</p>
-    <section class="card">
-      ${terminals.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>${tr('terminal_name')}</th><th>${tr('last_used')}</th><th class="hide-mobile">${tr('by_user')}</th><th></th></tr></thead>
-        <tbody>${terminals.map((t) => `<tr><td><strong>${esc(t.name)}</strong></td>
-          <td>${t.last_seen_at ? fmtDateTime(t.last_seen_at) : '—'}</td><td class="hide-mobile">${esc(t.created_by_name)} · ${fmtDate(t.created_at)}</td>
-          <td class="num"><button class="btn btn-small btn-danger" data-revoke="${t.id}" data-name="${esc(t.name)}">${tr('revoke')}</button></td></tr>`).join('')}
-        </tbody></table></div>` : `<p class="muted">${tr('no_terminals')}</p>`}
-    </section>`;
-  $('#btn-setup-terminal').onclick = () => openDialog(tr('setup_this_computer'), `
-    <p class="muted" style="margin-bottom:12px">${tr('terminal_setup_help')}</p>
-    <div class="field"><label>${tr('terminal_name')}</label><input name="name" required placeholder="${tr('terminal_name_placeholder')}"></div>`,
-  async (data) => {
-    const terminal = await api('POST', '/terminals', { name: data.get('name') });
-    // El administrador sale: a partir de ahora este ordenador abre directamente la pantalla de fichaje.
-    signOut();
-    activateTerminal(terminal);
-    return true;
-  });
-  $$('[data-revoke]').forEach((button) => {
-    button.onclick = () => {
-      if (!confirm(tr('confirm_revoke', { name: button.dataset.name }))) return;
-      run(async () => {
-        await api('DELETE', `/terminals/${button.dataset.revoke}`);
-        render();
-      });
-    };
-  });
-};
-
 // ── Admin: registro de cambios ──────────────────────────────
 const renderAudit = async () => {
   const rows = await api('GET', '/audit');
@@ -935,11 +914,15 @@ const boot = async () => {
   $('#btn-logout').onclick = signOut;
   window.addEventListener('hashchange', render);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.user?.role === 'worker') render();
+    if (document.visibilityState === 'visible' && state.user?.role === 'worker' && state.mode !== 'large') render();
   });
+
+  document.addEventListener('pointerdown', keepLargeAlive);
+  document.addEventListener('keydown', keepLargeAlive);
 
   state.token = storage.get(TOKEN_KEY);
   if (state.token) {
+    state.mode = 'mobile';
     $('#view').innerHTML = `<p class="muted">${tr('loading')}</p>`;
     state.user = await run(() => api('GET', '/me')) ?? null;
     if (!state.user) { state.token = null; storage.remove(TOKEN_KEY); }

@@ -193,64 +193,44 @@ dialog::backdrop { background: rgba(31, 45, 61, 0.55); }
 .place-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 .place-choice .ot-option { text-align: center; font-size: 1.1rem; }
 
-/* ── Primera pantalla ─────────────────── */
-.welcome { max-width: 760px; margin: 0 auto; text-align: center; }
-.welcome h2 { margin: 20px 0 12px; }
-.welcome-logo { width: 110px; border-radius: 12px; margin-top: 8px; }
-.device-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-.device-option {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 22px 16px; border: 2px solid var(--border); border-radius: var(--radius);
-  background: var(--white); color: var(--navy); font: inherit; cursor: pointer; box-shadow: var(--shadow);
-}
-.device-option:hover, .device-option:focus-visible { border-color: var(--navy); }
-.device-option strong { font-size: 1.3rem; }
-.device-icon { font-size: 2.6rem; line-height: 1; }
-.link-button { background: none; border: none; color: var(--steel); text-decoration: underline; font: inherit; margin-top: 14px; cursor: pointer; width: 100%; }
-
-/* ── Ordenador de fichaje ─────────────── */
-.kiosk-langs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 8px; }
-.kiosk-lang {
-  padding: 16px 8px; font: inherit; font-size: 1.15rem; font-weight: 600; border-radius: var(--radius);
+/* ── Inicio de sesión: idioma y forma de ver la pantalla ── */
+.login { max-width: 520px; }
+.login-langs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.login-lang {
+  padding: 12px 4px; font: inherit; font-weight: 600; border-radius: 10px;
   border: 2px solid var(--border); background: var(--white); color: var(--navy); cursor: pointer;
 }
-.kiosk-lang.selected { border-color: var(--navy); background: var(--navy); color: var(--white); }
-.kiosk { max-width: 1000px; margin: 0 auto; }
-.kiosk-mode main { max-width: none; }
-.kiosk-clock { text-align: center; margin: 4px 0 16px; }
-.kiosk-clock #kiosk-time { font-size: 4rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.kiosk-clock #kiosk-date { font-size: 1.1rem; }
-.kiosk-title { text-align: center; font-size: 2rem; margin: 18px 0 12px; }
-.kiosk-subtitle { text-align: center; font-size: 1.3rem; color: var(--steel); }
-.kiosk-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-.kiosk-name {
-  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  min-height: 84px; padding: 14px 16px; text-align: left; font: inherit; font-size: 1.15rem;
-  border: 2px solid var(--border); border-radius: var(--radius); background: var(--white); color: var(--navy); cursor: pointer;
-  box-shadow: var(--shadow);
+.login-lang.selected { border-color: var(--navy); background: var(--navy); color: var(--white); }
+.mode-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-option {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 10px;
+  font: inherit; border-radius: var(--radius); border: 2px solid var(--navy); background: var(--white);
+  color: var(--navy); cursor: pointer;
 }
-.kiosk-name:active, .key:active, .kiosk-lang:active, .device-option:active { transform: scale(0.97); }
-.kiosk-name .dot { position: absolute; top: 12px; right: 12px; width: 14px; height: 14px; border-radius: 50%; background: var(--green); }
-.kiosk-empty { display: block; padding: 14px; text-align: center; }
-.kiosk-admin-link { display: block; margin: 28px auto 0; background: none; border: none; color: var(--steel); font: inherit; cursor: pointer; }
-.kiosk-cancel { margin-top: 12px; }
-.pin-dots { display: flex; justify-content: center; gap: 18px; margin: 18px 0; }
-.pin-dots span { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--navy); }
-.pin-dots span.filled { background: var(--navy); }
-.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 380px; margin: 0 auto; }
-.key {
-  height: 76px; font: inherit; font-size: 2rem; font-weight: 600; border-radius: var(--radius);
-  border: 2px solid var(--border); background: var(--white); color: var(--navy); cursor: pointer; box-shadow: var(--shadow);
-}
-.kiosk .kiosk-cancel { display: block; max-width: 380px; margin: 16px auto 0; }
-.kiosk .card .kiosk-cancel, .kiosk section + .kiosk-cancel { max-width: none; }
-.kiosk-done { text-align: center; padding: 40px 16px; }
-.kiosk-done.in { border-top: 8px solid var(--green); }
-.kiosk-done.out { border-top: 8px solid var(--red); }
-.kiosk-check { font-size: 5rem; line-height: 1; color: var(--green); }
-.kiosk-done.out .kiosk-check { color: var(--red); }
-.kiosk-done-time { font-size: 3.5rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 8px 0; }
-.kiosk-mode .ot-option strong { font-size: 1.4rem; }
+.mode-option strong { font-size: 1.15rem; }
+.mode-option .muted { font-size: 0.8rem; }
+.mode-option:hover, .mode-option:focus-visible { background: var(--navy); color: var(--white); }
+.mode-option:hover .muted, .mode-option:focus-visible .muted { color: #c9d3dd; }
+.mode-icon { font-size: 2rem; line-height: 1; }
+.login-lang:active, .mode-option:active, .large .ot-option:active, .large .btn:active { transform: scale(0.97); }
+
+/* ── Pantalla grande (ordenadores táctiles) ── */
+.mode-large main { max-width: 1000px; }
+.large-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 14px; }
+.large-head h2 { font-size: 2rem; margin: 0; }
+.large-clock { font-size: 2.6rem; font-weight: 700; font-variant-numeric: tabular-nums; order: 2; }
+.mode-large .ot-option { padding: 20px; }
+.mode-large .ot-option strong { font-size: 1.5rem; }
+.mode-large .place-choice .ot-option { font-size: 1.3rem; padding: 24px; }
+.mode-large .btn-huge { padding: 28px; font-size: 1.6rem; }
+.mode-large .timer { font-size: 3.4rem; }
+.large-exit { margin-top: 4px; }
+.large-done { text-align: center; padding: 48px 16px; }
+.large-done.in { border-top: 8px solid var(--green); }
+.large-done.out { border-top: 8px solid var(--red); }
+.large-check { font-size: 5rem; line-height: 1; color: var(--green); }
+.large-done.out .large-check { color: var(--red); }
+.large-done-time { font-size: 3.5rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 8px 0; }
 
 /* ── Mis fichajes (tarjetas) ──────────── */
 .entry-cards { list-style: none; }
@@ -260,6 +240,7 @@ dialog::backdrop { background: rgba(31, 45, 61, 0.55); }
 .entry-card-hours span:first-child { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 640px) {
-  .kiosk-langs { grid-template-columns: repeat(2, 1fr); }
-  .kiosk-clock #kiosk-time { font-size: 3rem; }
+  .login-langs { grid-template-columns: repeat(2, 1fr); }
 }
+.mode-large .status-card .ot-big { font-size: 3rem; }
+.mode-large .status-card { font-size: 1.2rem; }
