@@ -5,7 +5,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from montar_prompts import RAIZ, AGENTES, montar
 
 RUTINAS = {
-    "correo":        ("Puerto TMB · Correo",        "CRON_TZ=Atlantic/Canary 7 8-18/2 * * 1-5", "Laborables cada 2 horas, de 8:07 a 18:07", "Ya creada: solo hay que añadirle los conectores y activarla."),
+    "correo":        ("Puerto TMB · Correo",        "CRON_TZ=Atlantic/Canary 7 8-18/2 * * 1-5", "Laborables cada 2 horas, de 8:07 a 18:07", "Ya creada y en pausa. Edítala: añade los conectores, sustituye su texto por este (es la versión corregida) y actívala."),
     "documentos":    ("Puerto TMB · Documentos",    "CRON_TZ=Atlantic/Canary 43 8 * * 1-5",     "Laborables a las 8:43", ""),
     "clientes":      ("Puerto TMB · Clientes",      "CRON_TZ=Atlantic/Canary 52 8,15 * * 1-5",  "Laborables a las 8:52 y a las 15:52", ""),
     "oportunidades": ("Puerto TMB · Oportunidades", "CRON_TZ=Atlantic/Canary 23 9 * * 1-5",     "Laborables a las 9:23", ""),
