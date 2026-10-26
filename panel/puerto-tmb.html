@@ -1,0 +1,608 @@
+<title>Puerto TMB</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Silkscreen&display=swap">
+<style>
+/* Layout: barra de mando arriba, luego la vista activa (puerto a lo ancho o tablero de gestión en rejilla) y un cajón lateral para el detalle. */
+:root {
+  --bg: #eef2f5;
+  --surface: #ffffff;
+  --surface-2: #e3e9ef;
+  --fg: #12202e;
+  --muted: #566676;
+  --line: #ccd6df;
+  --accent: #0b5f86;
+  --accent-fg: #ffffff;
+  --ok: #1d8a4f;
+  --need: #c8322b;
+  --review: #b7860b;
+  --idle: #7b8794;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-pixel: "Silkscreen", "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c141c; --surface: #131e29; --surface-2: #1b2835; --fg: #e3ebf2; --muted: #93a3b3;
+    --line: #26384a; --accent: #4fb0dc; --accent-fg: #06121b; --ok: #3fbf78; --need: #f0645b;
+    --review: #e2b33c; --idle: #8b98a5; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c141c; --surface: #131e29; --surface-2: #1b2835; --fg: #e3ebf2; --muted: #93a3b3;
+  --line: #26384a; --accent: #4fb0dc; --accent-fg: #06121b; --ok: #3fbf78; --need: #f0645b;
+  --review: #e2b33c; --idle: #8b98a5; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 40px;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+
+/* Barra de mando */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand h1 { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.brand span { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.counts { display: flex; flex-wrap: wrap; gap: 8px; }
+.count { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.count b { font-family: var(--font-data); font-weight: 500; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--idle); flex: none; }
+.dot.trabajando { background: var(--ok); } .dot.te_necesita { background: var(--need); } .dot.revisar { background: var(--review); } .dot.error { background: var(--need); }
+.switch { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.switch button { border: 0; background: transparent; padding: 6px 14px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.switch button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.notice { padding: 10px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+
+/* Vista puerto */
+.harbor { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 10px; overflow: hidden; background: #0b2233; border: 1px solid var(--line); }
+.harbor canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.ship-hit { position: absolute; background: transparent; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; }
+.ship-hit:hover .tag, .ship-hit:focus-visible .tag { outline: 2px solid #fff; }
+.tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-pixel); font-size: clamp(7px, 1.05vw, 12px); line-height: 1.2; color: #fff; background: rgba(5, 18, 28, .78); padding: 2px 6px; border-radius: 3px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.tag .dot { width: 7px; height: 7px; }
+.state-chip { font-family: var(--font-pixel); font-size: clamp(6px, .9vw, 10px); padding: 1px 5px; border-radius: 3px; color: #fff; white-space: nowrap; }
+.state-chip.trabajando { background: #1d8a4f; } .state-chip.te_necesita { background: #c8322b; } .state-chip.revisar { background: #a87a06; } .state-chip.dormido, .state-chip.sin_arrancar { background: #4c5967; } .state-chip.error { background: #7d1d18; }
+.banner { position: absolute; top: 0; left: 0; font-family: var(--font-pixel); font-size: clamp(7px, 1vw, 11px); color: #4a1410; background: #f6e7c8; border: 2px solid #4a1410; padding: 1px 6px; white-space: nowrap; pointer-events: none; will-change: transform; }
+.hud { position: absolute; left: 10px; top: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.hud span { font-family: var(--font-pixel); font-size: clamp(7px, .95vw, 11px); color: #fff; background: rgba(5, 18, 28, .72); padding: 3px 7px; border-radius: 3px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Vista gestión */
+.grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.panel h2 { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 0; display: flex; align-items: center; gap: 10px; }
+.panel h2 small { font-family: var(--font-data); font-weight: 400; font-size: 12px; color: var(--muted); margin-left: auto; }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+.items { display: grid; gap: 8px; }
+.item { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: 12px; padding: 10px 12px 10px 0; border-radius: 8px; background: var(--surface-2); }
+.item .stripe { border-radius: 4px 0 0 4px; background: var(--idle); }
+.item.decision .stripe { background: var(--need); } .item.revision .stripe { background: var(--review); }
+.item h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.meta { font-family: var(--font-data); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.item p { margin: 4px 0 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.ok { border-color: var(--ok); color: var(--ok); } .btn.no { border-color: var(--need); color: var(--need); }
+.btn:disabled { opacity: .5; cursor: default; }
+.actions input { flex: 1 1 180px; min-width: 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 13px; }
+a { color: var(--accent); }
+
+.agents { display: grid; gap: 8px; }
+.agent-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 0; text-align: left; width: 100%; }
+.agent-row strong { font-weight: 600; }
+.agent-row .task { grid-column: 2 / 4; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.agent-row .when { font-family: var(--font-data); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button { border: 0; background: transparent; padding: 8px 12px; font-size: 14px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs button b { font-family: var(--font-data); font-weight: 400; font-size: 12px; margin-left: 4px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; max-width: 320px; overflow-wrap: anywhere; }
+td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+tbody tr { cursor: pointer; } tbody tr:hover { background: var(--surface-2); }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar input { flex: 1 1 200px; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+
+.log { display: grid; gap: 2px; font-size: 14px; max-height: 420px; overflow-y: auto; }
+.log div { display: grid; grid-template-columns: 52px 120px minmax(0, 1fr); gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+@media (max-width: 520px) { .log div { grid-template-columns: 46px minmax(0, 1fr); } .log div .who { display: none; } }
+.log time, .log .who { font-family: var(--font-data); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.log span:last-child { overflow-wrap: anywhere; }
+
+/* Cajón de detalle y formularios */
+.scrim { position: fixed; inset: 0; background: rgba(4, 12, 20, .45); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface); border-left: 1px solid var(--line); z-index: 21; overflow-y: auto; display: grid; align-content: start; gap: 14px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) 18px; }
+.drawer header { display: flex; align-items: center; gap: 10px; }
+.drawer header h2 { font-family: var(--font-display); font-size: 22px; margin: 0; margin-right: auto; }
+.drawer dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; }
+.drawer dt { color: var(--muted); } .drawer dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.form { display: grid; gap: 10px; }
+.form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.form input, .form select, .form textarea { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 14px; }
+.form textarea { min-height: 80px; resize: vertical; }
+.confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-size: 14px; z-index: 30; }
+@media (max-width: 560px) { .state-chip { display: none; } .tag .dot { width: 6px; height: 6px; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <div class="brand"><h1>Puerto TMB</h1><span id="clock">Las Palmas</span></div>
+    <div class="counts" id="counts" aria-live="polite"></div>
+    <div class="switch" role="group" aria-label="Vista">
+      <button type="button" id="v-puerto" aria-pressed="true">Puerto</button>
+      <button type="button" id="v-gestion" aria-pressed="false">Gestión</button>
+    </div>
+  </div>
+
+  <div class="notice" id="dbnotice" hidden></div>
+
+  <section id="view-puerto" class="wrap" aria-label="Vista puerto">
+    <div class="harbor" id="harbor">
+      <canvas id="sea" width="384" height="216" aria-hidden="true"></canvas>
+      <div id="overlay"></div>
+      <div class="banner" id="banner" hidden></div>
+      <div class="hud" id="hud"></div>
+    </div>
+    <div class="legend">
+      <span><i class="dot trabajando"></i>Luz verde: trabajando</span>
+      <span><i class="dot te_necesita"></i>Roja: te necesita</span>
+      <span><i class="dot revisar"></i>Ámbar: terminado, para revisar</span>
+      <span><i class="dot"></i>Apagado: amarrado hasta su próxima salida</span>
+      <span>Avioneta: lo más urgente · Gaviota: correo urgente · Lancha: mensaje entre agentes · Faro: pendientes</span>
+    </div>
+  </section>
+
+  <section id="view-gestion" class="wrap" aria-label="Vista gestión" hidden>
+    <div class="grid">
+      <div class="panel">
+        <h2>Te necesitan <small id="pend-count"></small></h2>
+        <div class="items" id="pendientes"></div>
+      </div>
+      <div class="panel">
+        <h2>Flota de agentes</h2>
+        <div class="agents" id="agents"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Buscar en esta lista" aria-label="Buscar">
+        <button class="btn primary" type="button" id="add">Añadir</button>
+      </div>
+      <div class="table-wrap" id="table"></div>
+    </div>
+    <div class="grid">
+      <div class="panel">
+        <h2>Cuaderno de bitácora
+          <small><label for="logdate">Día </label><input id="logdate" type="date" style="font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 2px 6px;"></small>
+        </h2>
+        <div class="log" id="log"></div>
+      </div>
+      <div class="panel">
+        <h2>Mensajes entre agentes</h2>
+        <div class="log" id="msgs"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="drawer-title"></aside>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+(() => {
+  "use strict";
+  const TZ = "Atlantic/Canary";
+
+  // ---- Flota: un barco por agente ----
+  const AGENTS = [
+    { id: "correo", nombre: "Correo", barco: "MV Gaviota", rol: "Lee Gmail, clasifica, marca lo urgente y deja borradores de respuesta.", hull: "#2a5d8f", top: "#e8e2d4" },
+    { id: "documentos", nombre: "Documentos", barco: "MV Archivo", rol: "Ordena y resume informes, certificados y presupuestos en Drive.", hull: "#6b4f8a", top: "#e8e2d4" },
+    { id: "clientes", nombre: "Clientes y presupuestos", barco: "MV Armador", rol: "Sigue clientes, presupuestos enviados, aceptados y facturación pendiente.", hull: "#1f7a5a", top: "#efe9db" },
+    { id: "oportunidades", nombre: "Oportunidades", barco: "MV Rumbo", rol: "Detecta peticiones de oferta, buques entrantes y clientes a recuperar.", hull: "#b5562b", top: "#efe9db" },
+    { id: "proveedores", nombre: "Proveedores", barco: "MV Estiba", rol: "Controla pedidos, ofertas y facturas de proveedores y subcontratas.", hull: "#7a6a2a", top: "#e8e2d4" },
+  ];
+  const AG = Object.fromEntries(AGENTS.map(a => [a.id, a]));
+  const STATE_LABEL = { trabajando: "Trabajando", te_necesita: "Te necesita", revisar: "Para revisar", dormido: "Amarrado", sin_arrancar: "Sin arrancar", error: "Avería" };
+
+  // ---- Colecciones de gestión ----
+  const SETS = {
+    clientes: { label: "Clientes", fields: [
+      ["nombre", "Nombre"], ["empresa", "Empresa / armador"], ["email", "Email"], ["telefono", "Teléfono"],
+      ["estado", "Estado", ["activo", "potencial", "inactivo"]], ["notas", "Notas", "area"]], cols: ["nombre", "empresa", "email", "estado"] },
+    presupuestos: { label: "Presupuestos", fields: [
+      ["referencia", "Referencia"], ["cliente", "Cliente"], ["buque", "Buque"], ["importe", "Importe (€)", "num"],
+      ["estado", "Estado", ["borrador", "enviado", "aceptado", "rechazado", "facturado", "cobrado"]], ["fecha", "Fecha", "date"], ["notas", "Notas", "area"]], cols: ["referencia", "cliente", "buque", "importe", "estado", "fecha"] },
+    oportunidades: { label: "Oportunidades", fields: [
+      ["titulo", "Oportunidad"], ["cliente", "Cliente"], ["buque", "Buque"], ["fuente", "De dónde viene"], ["valor", "Valor estimado (€)", "num"],
+      ["etapa", "Etapa", ["detectada", "contactada", "presupuestada", "ganada", "perdida"]], ["siguientePaso", "Siguiente paso"], ["notas", "Notas", "area"]], cols: ["titulo", "cliente", "valor", "etapa", "siguientePaso"] },
+    proveedores: { label: "Proveedores", fields: [
+      ["nombre", "Nombre"], ["categoria", "Qué suministra"], ["email", "Email"], ["telefono", "Teléfono"],
+      ["estado", "Estado", ["activo", "pendiente", "bloqueado"]], ["pendiente", "Pendiente con él"], ["notas", "Notas", "area"]], cols: ["nombre", "categoria", "estado", "pendiente"] },
+    documentos: { label: "Documentos", fields: [
+      ["titulo", "Título"], ["tipo", "Tipo", ["informe", "certificado", "presupuesto", "factura", "contrato", "otro"]], ["cliente", "Cliente / buque"],
+      ["enlace", "Enlace (Drive)"], ["fecha", "Fecha", "date"], ["resumen", "Resumen", "area"]], cols: ["titulo", "tipo", "cliente", "fecha"] },
+  };
+
+  // ---- Estado en memoria ----
+  const S = { agentes: {}, pendientes: [], mensajes: [], registro: [], bandeja: null, sets: {}, tab: "clientes", view: "puerto", canWrite: true };
+  let db = null, unsubLog = null;
+
+  // ---- Utilidades ----
+  const $ = id => document.getElementById(id);
+  const el = (tag, props = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v; else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+    }
+    for (const k of kids) if (k != null) n.append(k);
+    return n;
+  };
+  const str = v => (v == null ? "" : String(v));
+  const safeUrl = u => { try { const x = new URL(str(u)); return x.protocol === "https:" ? x.href : null; } catch { return null; } };
+  const dayKey = d => new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const hhmm = iso => { const d = new Date(iso); return isNaN(d) ? "" : new Intl.DateTimeFormat("es-ES", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(d); };
+  const ago = iso => {
+    const d = new Date(iso); if (isNaN(d)) return "nunca";
+    const m = Math.round((Date.now() - d) / 60000);
+    if (m < 1) return "ahora"; if (m < 60) return `hace ${m} min`;
+    const h = Math.round(m / 60); if (h < 24) return `hace ${h} h`;
+    return new Intl.DateTimeFormat("es-ES", { timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(d);
+  };
+  const eur = v => { const n = Number(v); return isFinite(n) && str(v) !== "" ? n.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }) : ""; };
+  const toast = msg => { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 2600); };
+  const agentState = id => {
+    const a = S.agentes[id]; if (!a) return "sin_arrancar";
+    return STATE_LABEL[a.estado] ? a.estado : "dormido";
+  };
+  const openPend = () => S.pendientes.filter(p => p.estado === "abierto");
+
+  // ---- Vista ----
+  function setView(v) {
+    S.view = v;
+    $("view-puerto").hidden = v !== "puerto"; $("view-gestion").hidden = v !== "gestion";
+    $("v-puerto").setAttribute("aria-pressed", v === "puerto"); $("v-gestion").setAttribute("aria-pressed", v === "gestion");
+    try { localStorage.setItem("vista", v); } catch {}
+    if (v === "gestion") renderGestion();
+  }
+  $("v-puerto").onclick = () => setView("puerto");
+  $("v-gestion").onclick = () => setView("gestion");
+
+  function renderCounts() {
+    const c = { trabajando: 0, te_necesita: 0, revisar: 0 };
+    AGENTS.forEach(a => { const s = agentState(a.id); if (s in c) c[s]++; });
+    const need = openPend().filter(p => p.tipo !== "revision").length, rev = openPend().filter(p => p.tipo === "revision").length;
+    const box = $("counts"); box.replaceChildren(
+      el("span", { class: "count" }, el("i", { class: "dot trabajando" }), el("b", { text: c.trabajando }), " trabajando"),
+      el("span", { class: "count" }, el("i", { class: "dot te_necesita" }), el("b", { text: need }), " te necesitan"),
+      el("span", { class: "count" }, el("i", { class: "dot revisar" }), el("b", { text: rev }), " para revisar"));
+  }
+
+  function tick() {
+    $("clock").textContent = "Las Palmas · " + new Intl.DateTimeFormat("es-ES", { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
+  }
+  tick(); setInterval(tick, 30000);
+
+  // ---- Puerto (canvas) ----
+  const cv = $("sea"), cx = cv.getContext("2d"); cx.imageSmoothingEnabled = false;
+  const W = 384, H = 216, QUAY_Y = 122, SHIP_Y = 162;
+  const SHIP_X = [18, 90, 162, 234, 306]; // posición de cada barco
+  const SHIP_W = 62;
+  const STATE_RGB = { trabajando: "#4dff8f", te_necesita: "#ff4b3e", revisar: "#ffc93c", dormido: "#3a4552", sin_arrancar: "#2b333c", error: "#ff4b3e" };
+
+  function canaryHour() { const p = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()).split(":"); return +p[0] + p[1] / 60; }
+  function sky(h) {
+    if (h >= 8 && h < 18.5) return ["#7fc4ea", "#bfe3f5", "#2f7fae", "#256a93"];
+    if ((h >= 6.5 && h < 8) || (h >= 18.5 && h < 20)) return ["#f08a5d", "#f7c58b", "#3a6d8f", "#2a5672"];
+    return ["#0b1a2e", "#1d3350", "#0d2a40", "#0a2133"];
+  }
+  const R = (x, y, w, h, c) => { cx.fillStyle = c; cx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+
+  function drawShip(i, a, t) {
+    const x = SHIP_X[i], st = agentState(a.id), bob = Math.round(Math.sin(t / 700 + i) * 0.8), y = SHIP_Y + bob;
+    const night = !(canaryHour() >= 8 && canaryHour() < 18.5);
+    // casco
+    R(x, y, SHIP_W, 12, a.hull); R(x + 3, y + 12, SHIP_W - 8, 4, a.hull); R(x, y + 9, SHIP_W, 2, "#d9d2c3");
+    R(x - 3, y - 2, 6, 6, a.hull); // proa
+    // superestructura
+    R(x + 30, y - 18, 26, 18, a.top); R(x + 34, y - 26, 18, 8, a.top);
+    // ventanas del puente = luz de estado
+    const lc = STATE_RGB[st] || STATE_RGB.dormido;
+    const blink = st === "te_necesita" && Math.floor(t / 450) % 2 === 0;
+    for (let k = 0; k < 4; k++) R(x + 36 + k * 4, y - 24, 3, 3, blink ? "#5a1410" : lc);
+    for (let k = 0; k < 5; k++) R(x + 32 + k * 5, y - 13, 3, 3, night ? "#ffd982" : "#7a8a99");
+    // chimenea
+    R(x + 46, y - 34, 6, 8, "#1b2733"); R(x + 46, y - 31, 6, 2, "#c8322b");
+    // humo cuando trabaja
+    if (st === "trabajando") for (let k = 0; k < 4; k++) {
+      const p = ((t / 60 + k * 9) % 36);
+      R(x + 47 + p * 0.4, y - 38 - p, 4 - k * 0.5, 3, `rgba(220,226,232,${0.75 - p / 50})`);
+    }
+    // carga en cubierta
+    const cols = ["#c8322b", "#2a5d8f", "#d9a21b", "#1f7a5a"];
+    const n = Math.min(6, (S.sets[{ correo: "documentos", documentos: "documentos", clientes: "presupuestos", oportunidades: "oportunidades", proveedores: "proveedores" }[a.id]] || []).length);
+    for (let k = 0; k < n; k++) R(x + 4 + (k % 3) * 8, y - 6 - Math.floor(k / 3) * 5, 7, 5, cols[(k + i) % 4]);
+    // cabo al muelle
+    R(x + 6, QUAY_Y + 4, 1, y - QUAY_Y - 4, "#3b2a1a");
+    // reflejo de la luz
+    if (st !== "dormido" && st !== "sin_arrancar") R(x + 36, y + 20, 14, 1, lc + "88");
+  }
+
+  function draw(t) {
+    const h = canaryHour(); const [s1, s2, sea1, sea2] = sky(h);
+    const night = !(h >= 8 && h < 18.5);
+    // cielo
+    for (let k = 0; k < 10; k++) R(0, k * 8, W, 8, k < 5 ? s1 : s2);
+    // sol / luna
+    if (night) { R(320, 18, 10, 10, "#f2efe2"); R(323, 18, 7, 7, s1); for (let k = 0; k < 18; k++) R((k * 53) % W, (k * 29) % 60, 1, 1, "#d8e4f0"); }
+    else R(318, 16, 14, 14, "#ffe27a");
+    // La Isleta y la ciudad al fondo
+    cx.fillStyle = night ? "#152234" : "#6b8aa3";
+    cx.beginPath(); cx.moveTo(0, 92); cx.lineTo(40, 70); cx.lineTo(70, 80); cx.lineTo(100, 66); cx.lineTo(140, 88); cx.lineTo(140, 100); cx.lineTo(0, 100); cx.fill();
+    for (let k = 0; k < 26; k++) {
+      const bx = 140 + k * 9, bh = 10 + ((k * 37) % 22);
+      R(bx, 100 - bh, 8, bh, night ? "#1a2a3f" : "#9fb3c4");
+      if (night) for (let j = 0; j < bh / 5; j++) if ((k + j) % 3) R(bx + 2 + (j % 2) * 3, 100 - bh + 2 + j * 5, 1, 1, "#ffd982");
+    }
+    // grúas del puerto
+    for (const gx of [178, 262]) { R(gx, 64, 3, 36, "#d9a21b"); R(gx - 12, 64, 30, 3, "#d9a21b"); R(gx + 15, 67, 1, 10, "#3b2a1a"); }
+    // mar
+    for (let k = 0; k < 12; k++) R(0, 100 + k * 10, W, 10, k % 2 ? sea1 : sea2);
+    for (let k = 0; k < 30; k++) { const wx = (k * 47 + t / 40) % W, wy = 104 + (k * 23) % 108; R(wx, wy, 6, 1, "rgba(255,255,255,.18)"); }
+    // muelle
+    R(0, QUAY_Y - 8, W, 12, "#8d8576"); R(0, QUAY_Y + 4, W, 2, "#5b5447");
+    for (let k = 0; k < 24; k++) R(8 + k * 16, QUAY_Y - 10, 3, 3, "#3d3a35"); // bolardos
+    // faro: los pendientes
+    const np = openPend().length;
+    R(362, 64, 10, 36, "#f2efe2"); R(362, 72, 10, 4, "#c8322b"); R(362, 84, 10, 4, "#c8322b"); R(360, 58, 14, 6, "#2b333c");
+    R(363, 59, 8, 4, np ? (Math.floor(t / 500) % 2 ? "#ff4b3e" : "#ffd982") : "#4a5560");
+    if (np && night) { cx.fillStyle = "rgba(255,217,130,.12)"; cx.beginPath(); cx.moveTo(367, 61); const a = (t / 1500) % (Math.PI * 2); cx.lineTo(367 + Math.cos(a) * 120, 61 + Math.sin(a) * 18 - 8); cx.lineTo(367 + Math.cos(a) * 120, 61 + Math.sin(a) * 18 + 8); cx.fill(); }
+    // barcos
+    AGENTS.forEach((a, i) => drawShip(i, a, t));
+    // lancha con mensajes sin leer
+    const pend = S.mensajes.filter(m => !m.leido && AG[m.de] && AG[m.para]);
+    if (pend.length) {
+      const m = pend[Math.floor(t / 6000) % pend.length];
+      const x0 = SHIP_X[AGENTS.indexOf(AG[m.de])] + 30, x1 = SHIP_X[AGENTS.indexOf(AG[m.para])] + 30;
+      const f = (t % 6000) / 6000, bx = x0 + (x1 - x0) * f, by = 206 + Math.sin(f * Math.PI) * 3;
+      R(bx, by, 10, 4, "#f2efe2"); R(bx + 3, by - 3, 4, 3, "#c8322b"); R(bx - 4, by + 2, 4, 1, "rgba(255,255,255,.5)");
+    }
+    // gaviota con correo urgente
+    const urg = S.bandeja && Number(S.bandeja.urgentes) > 0;
+    if (urg) { const gx = (t / 25) % (W + 40) - 20, gy = 40 + Math.sin(t / 400) * 4, wing = Math.floor(t / 200) % 2;
+      R(gx, gy, 5, 2, "#f6f6f6"); R(gx - 3, gy - wing * 2, 3, 1, "#f6f6f6"); R(gx + 5, gy - wing * 2, 3, 1, "#f6f6f6"); R(gx + 4, gy + 1, 2, 1, "#f0a020"); }
+    // avioneta con lo más urgente
+    const top = openPend().filter(p => p.tipo !== "revision")[0];
+    const ban = $("banner");
+    if (top) {
+      const px = W - ((t / 18) % (W + 260)), py = 44;
+      R(px, py, 14, 4, "#e8e2d4"); R(px + 4, py - 3, 5, 3, "#c8322b"); R(px + 2, py + 4, 8, 1, "#3b2a1a"); R(px - 1, py + 1, 1, 3, "#555");
+      R(px + 14, py + 2, 10, 1, "#3b2a1a");
+      ban.hidden = false; ban.textContent = (AG[top.agente]?.nombre || "Aviso") + " · " + str(top.titulo).slice(0, 70);
+      const box = $("harbor").getBoundingClientRect(), sc = box.width / W;
+      ban.style.transform = `translate(${(px + 24) * sc}px, ${(py - 4) * sc}px)`;
+    } else ban.hidden = true;
+    requestAnimationFrame(draw);
+  }
+
+  function renderOverlay() {
+    const ov = $("overlay"); ov.replaceChildren();
+    AGENTS.forEach((a, i) => {
+      const st = agentState(a.id);
+      const b = el("button", { class: "ship-hit", type: "button", "aria-label": `${a.barco}, agente de ${a.nombre}: ${STATE_LABEL[st]}`, onclick: () => openAgent(a.id) },
+        el("span", { class: "tag" }, el("i", { class: "dot " + st }), a.nombre),
+        el("span", { class: "state-chip " + st, text: STATE_LABEL[st] }));
+      b.style.left = (SHIP_X[i] - 4) / W * 100 + "%"; b.style.width = (SHIP_W + 8) / W * 100 + "%";
+      b.style.top = (SHIP_Y - 36) / H * 100 + "%"; b.style.height = 54 / H * 100 + "%"; b.style.justifyContent = "flex-end";
+      ov.append(b);
+    });
+    const hud = $("hud"); hud.replaceChildren();
+    const np = openPend().length;
+    hud.append(el("span", { text: `Faro: ${np} pendiente${np === 1 ? "" : "s"}` }));
+    if (S.bandeja) hud.append(el("span", { text: `Correo: ${Number(S.bandeja.sinLeer) || 0} sin leer · ${Number(S.bandeja.urgentes) || 0} urgentes · ${Number(S.bandeja.borradores) || 0} borradores` }));
+    const unread = S.mensajes.filter(m => !m.leido).length; if (unread) hud.append(el("span", { text: `Lancha: ${unread} mensaje${unread === 1 ? "" : "s"} entre agentes` }));
+    const last = S.registro[S.registro.length - 1]; if (last) hud.append(el("span", { text: `${hhmm(last.hora)} ${AG[last.agente]?.nombre || ""}: ${str(last.texto).slice(0, 80)}` }));
+  }
+
+  // ---- Gestión ----
+  function pendienteCard(p, compact) {
+    const a = AG[p.agente];
+    const node = el("div", { class: "item " + (p.tipo === "revision" ? "revision" : "decision") }, el("div", { class: "stripe" }));
+    const body = el("div", {},
+      el("h3", { text: str(p.titulo) || "(sin título)" }),
+      el("div", { class: "meta" }, el("span", { text: a ? a.nombre : str(p.agente) }), el("span", { text: p.tipo === "revision" ? "Para revisar" : "Decisión" }), el("span", { text: ago(p.creado) })));
+    if (p.detalle) body.append(el("p", { text: str(p.detalle) }));
+    const link = safeUrl(p.enlace); if (link) body.append(el("p", {}, el("a", { href: link, target: "_blank", rel: "noopener", text: "Abrir el original" })));
+    if (S.canWrite) {
+      const note = el("input", { type: "text", id: "nota-" + p._id, placeholder: "Nota para el agente (opcional)", "aria-label": "Nota para el agente" });
+      const act = (estado, msg) => async () => {
+        try { await db.doc("pendientes/" + p._id).update({ estado, respuesta: note.value.trim(), resuelto: new Date().toISOString() }); toast(msg); }
+        catch (e) { toast("No se ha guardado: " + (e && e.code || "error")); }
+      };
+      const row = el("div", { class: "actions" }, note);
+      if (p.tipo === "revision") row.append(el("button", { class: "btn ok", type: "button", text: "Revisado", onclick: act("hecho", "Marcado como revisado") }));
+      else row.append(el("button", { class: "btn ok", type: "button", text: "Aprobar", onclick: act("aprobado", "Aprobado. El agente lo verá en su próxima salida") }),
+                      el("button", { class: "btn no", type: "button", text: "Rechazar", onclick: act("rechazado", "Rechazado") }));
+      body.append(row);
+    }
+    node.append(body); return node;
+  }
+
+  function renderGestion() {
+    if (S.view !== "gestion") return;
+    const open = openPend().sort((x, y) => (x.tipo === "revision") - (y.tipo === "revision") || str(y.creado).localeCompare(str(x.creado)));
+    $("pend-count").textContent = open.length ? `${open.length} abiertos` : "";
+    $("pendientes").replaceChildren(...(open.length ? open.map(p => pendienteCard(p)) :
+      [el("div", { class: "empty", text: "Nada pendiente. Cuando un agente necesite una decisión o termine algo para revisar, aparecerá aquí." })]));
+
+    $("agents").replaceChildren(...AGENTS.map(a => {
+      const d = S.agentes[a.id] || {}, st = agentState(a.id);
+      return el("button", { class: "agent-row", type: "button", onclick: () => openAgent(a.id) },
+        el("i", { class: "dot " + st }), el("strong", { text: `${a.nombre} · ${STATE_LABEL[st]}` }), el("span", { class: "when", text: ago(d.ultimaEjecucion) }),
+        el("span", { class: "task", text: str(d.tarea) || a.rol }));
+    }));
+
+    renderTabs(); renderTable(); renderLog(); renderMsgs();
+  }
+
+  function renderTabs() {
+    $("tabs").replaceChildren(...Object.entries(SETS).map(([k, s]) => el("button", { type: "button", role: "tab", "aria-selected": S.tab === k,
+      onclick: () => { S.tab = k; $("search").value = ""; renderTabs(); renderTable(); } }, s.label, el("b", { text: (S.sets[k] || []).length }))));
+  }
+
+  function cellValue(def, v) { return def && def[2] === "num" ? eur(v) : str(v); }
+  function renderTable() {
+    const set = SETS[S.tab], rows = (S.sets[S.tab] || []).slice(), q = $("search").value.trim().toLowerCase();
+    const fdef = Object.fromEntries(set.fields.map(f => [f[0], f]));
+    const list = q ? rows.filter(r => set.fields.some(f => str(r[f[0]]).toLowerCase().includes(q))) : rows;
+    list.sort((x, y) => str(y.actualizado).localeCompare(str(x.actualizado)));
+    $("add").hidden = !S.canWrite;
+    if (!list.length) { $("table").replaceChildren(el("div", { class: "empty", text: q ? "Sin resultados para esa búsqueda." : `Aún no hay ${set.label.toLowerCase()}. Los agentes los irán añadiendo, o pulsa Añadir.` })); return; }
+    const head = el("tr", {}, ...set.cols.map(c => el("th", { text: fdef[c][1].replace(" (€)", "") })), el("th", { text: "Origen" }));
+    const body = list.map(r => el("tr", { tabindex: "0", onclick: () => openRecord(S.tab, r), onkeydown: e => { if (e.key === "Enter") openRecord(S.tab, r); } },
+      ...set.cols.map(c => {
+        const d = fdef[c], v = r[c];
+        if (Array.isArray(d[2])) return el("td", {}, v ? el("span", { class: "pill", text: str(v) }) : "");
+        return el("td", { class: d[2] === "num" ? "num" : "", text: cellValue(d, v) });
+      }), el("td", { text: AG[r.origen] ? AG[r.origen].nombre : (r.origen ? str(r.origen) : "Manual") })));
+    $("table").replaceChildren(el("table", {}, el("thead", {}, head), el("tbody", {}, ...body)));
+  }
+  $("search").addEventListener("input", renderTable);
+  $("add").onclick = () => openRecord(S.tab, null);
+
+  function renderLog() {
+    const evs = S.registro.slice().sort((x, y) => str(y.hora).localeCompare(str(x.hora)));
+    $("log").replaceChildren(...(evs.length ? evs.map(e => el("div", {}, el("time", { text: hhmm(e.hora) }), el("span", { class: "who", text: AG[e.agente]?.nombre || str(e.agente) }), el("span", { text: str(e.texto) })))
+      : [el("div", { class: "empty", style: "display:block", text: "Sin actividad registrada ese día." })]));
+  }
+  function renderMsgs() {
+    const ms = S.mensajes.slice().sort((x, y) => str(y.creado).localeCompare(str(x.creado))).slice(0, 40);
+    $("msgs").replaceChildren(...(ms.length ? ms.map(m => el("div", {}, el("time", { text: hhmm(m.creado) }), el("span", { class: "who", text: `${AG[m.de]?.nombre || str(m.de)} → ${AG[m.para]?.nombre || str(m.para)}` }), el("span", { text: (m.leido ? "" : "● ") + str(m.texto) })))
+      : [el("div", { class: "empty", style: "display:block", text: "Cuando un agente necesite algo de otro (por ejemplo, Correo avisa a Proveedores de una factura), lo verás aquí." })]));
+  }
+
+  // ---- Cajón ----
+  function openDrawer(title, ...content) {
+    const d = $("drawer");
+    d.replaceChildren(el("header", {}, el("h2", { id: "drawer-title", text: title }), el("button", { class: "btn", type: "button", text: "Cerrar", onclick: closeDrawer })), ...content);
+    d.hidden = false; $("scrim").hidden = false; d.querySelector("button").focus();
+  }
+  function closeDrawer() { $("drawer").hidden = true; $("scrim").hidden = true; }
+  $("scrim").onclick = closeDrawer;
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("drawer").hidden) closeDrawer(); });
+
+  function openAgent(id) {
+    const a = AG[id], d = S.agentes[id] || {}, st = agentState(id);
+    const dl = el("dl", {},
+      el("dt", { text: "Barco" }), el("dd", { text: a.barco }),
+      el("dt", { text: "Estado" }), el("dd", {}, el("span", { class: "state-chip " + st, text: STATE_LABEL[st] })),
+      el("dt", { text: "Su trabajo" }), el("dd", { text: a.rol }),
+      el("dt", { text: "Ahora" }), el("dd", { text: str(d.tarea) || "—" }),
+      el("dt", { text: "Última salida" }), el("dd", { text: ago(d.ultimaEjecucion) }),
+      el("dt", { text: "Próxima" }), el("dd", { text: str(d.proxima) || "—" }),
+      el("dt", { text: "Salidas" }), el("dd", { text: str(d.ejecuciones || 0) }),
+      el("dt", { text: "Resumen" }), el("dd", { text: str(d.resumen) || "—" }));
+    const mine = openPend().filter(p => p.agente === id);
+    const hoy = S.registro.filter(e => e.agente === id).slice(-12).reverse();
+    openDrawer(a.nombre, dl,
+      el("h3", { text: mine.length ? "Lo que te pide" : "No te pide nada ahora mismo", style: "margin:0;font-family:var(--font-display);font-size:18px" }),
+      ...mine.map(p => pendienteCard(p)),
+      el("h3", { text: "Hoy en su bitácora", style: "margin:0;font-family:var(--font-display);font-size:18px" }),
+      el("div", { class: "log" }, ...(hoy.length ? hoy.map(e => el("div", {}, el("time", { text: hhmm(e.hora) }), el("span", { class: "who", text: "" }), el("span", { text: str(e.texto) }))) : [el("div", { class: "empty", style: "display:block", text: "Sin actividad hoy." })])));
+  }
+
+  function openRecord(kind, rec) {
+    const set = SETS[kind], isNew = !rec, form = el("form", { class: "form" });
+    for (const [k, label, type] of set.fields) {
+      let input; const id = `f-${kind}-${k}`, v = rec ? str(rec[k]) : "";
+      if (Array.isArray(type)) { input = el("select", { id, name: k }, el("option", { value: "", text: "—" }), ...type.map(o => el("option", { value: o, text: o }))); input.value = v; }
+      else if (type === "area") { input = el("textarea", { id, name: k }); input.value = v; }
+      else { input = el("input", { id, name: k, type: type === "num" ? "number" : type === "date" ? "date" : "text", step: type === "num" ? "any" : null }); input.value = v; }
+      if (input.getAttribute("step") === "null") input.removeAttribute("step");
+      form.append(el("label", { for: id }, label, input));
+    }
+    const info = rec ? el("p", { class: "meta", text: `Origen: ${AG[rec.origen]?.nombre || (rec.origen ? str(rec.origen) : "Manual")} · Actualizado ${ago(rec.actualizado)}` }) : null;
+    const fuente = rec && safeUrl(rec.fuenteUrl) ? el("p", {}, el("a", { href: safeUrl(rec.fuenteUrl), target: "_blank", rel: "noopener", text: "Ver el correo o documento de origen" })) : null;
+    const buttons = el("div", { class: "actions" });
+    if (S.canWrite) {
+      buttons.append(el("button", { class: "btn primary", type: "submit", text: isNew ? "Añadir" : "Guardar" }));
+      if (!isNew) buttons.append(el("button", { class: "btn no", type: "button", text: "Borrar", onclick: () => {
+        const c = el("div", { class: "confirm" }, "¿Borrar este registro?",
+          el("button", { class: "btn no", type: "button", text: "Sí, borrar", onclick: async () => { try { await db.doc(`${kind}/${rec._id}`).delete(); closeDrawer(); toast("Borrado"); } catch (e) { toast("No se ha borrado: " + (e && e.code || "error")); } } }),
+          el("button", { class: "btn", type: "button", text: "Cancelar", onclick: () => c.remove() }));
+        buttons.after(c);
+      } }));
+    }
+    form.append(buttons);
+    form.addEventListener("submit", async e => {
+      e.preventDefault(); if (!S.canWrite) return;
+      const data = {}; for (const [k, , type] of set.fields) { const v = form.elements[k].value.trim(); data[k] = type === "num" && v !== "" ? Number(v) : v; }
+      data.actualizado = new Date().toISOString();
+      try {
+        if (isNew) { data.origen = "manual"; await db.collection(kind).add(data); toast("Añadido"); }
+        else { await db.doc(`${kind}/${rec._id}`).update(data); toast("Guardado"); }
+        closeDrawer();
+      } catch (err) { toast("No se ha guardado: " + (err && err.code || "error")); }
+    });
+    openDrawer(isNew ? `Nuevo: ${set.label.toLowerCase()}` : str(rec[set.fields[0][0]]) || set.label, ...[info, fuente, form].filter(Boolean));
+  }
+
+  // ---- Datos ----
+  function rerender() { renderCounts(); renderOverlay(); renderGestion(); }
+  const docs = snap => snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+  const onErr = name => e => { $("dbnotice").hidden = false; $("dbnotice").textContent = `No se puede leer ${name} (${e && e.code}). Recarga la página.`; };
+
+  function subscribeLog(day) {
+    if (unsubLog) unsubLog();
+    unsubLog = db.doc("registro/" + day).onSnapshot(s => { const d = s.exists ? s.data() : null; S.registro = d && Array.isArray(d.eventos) ? d.eventos : []; rerender(); }, onErr("la bitácora"));
+  }
+
+  async function start() {
+    try { const v = localStorage.getItem("vista"); if (v === "gestion") setView("gestion"); } catch {}
+    $("logdate").value = dayKey(new Date());
+    renderCounts(); renderOverlay(); renderGestion();
+    requestAnimationFrame(draw);
+    window.addEventListener("resize", renderOverlay);
+    if (!window.claude || !window.claude.use) { showOffline(); return; }
+    db = await window.claude.use("db");
+    if (!db) { showOffline(); return; }
+    const user = await window.claude.use("user");
+    if (user) { const c = await user.can("data.write"); if (c === false) S.canWrite = false; }
+    db.collection("agentes").onSnapshot(s => { S.agentes = Object.fromEntries(docs(s).map(d => [d._id, d])); rerender(); }, onErr("los agentes"));
+    db.collection("pendientes").orderBy("creado", "desc").limit(300).onSnapshot(s => { S.pendientes = docs(s); rerender(); }, onErr("los pendientes"));
+    db.collection("mensajes").orderBy("creado", "desc").limit(100).onSnapshot(s => { S.mensajes = docs(s); rerender(); }, onErr("los mensajes"));
+    db.doc("estado/bandeja").onSnapshot(s => { S.bandeja = s.exists ? s.data() : null; rerender(); }, onErr("la bandeja"));
+    for (const k of Object.keys(SETS)) db.collection(k).limit(1000).onSnapshot(s => { S.sets[k] = docs(s); rerender(); }, onErr(SETS[k].label.toLowerCase()));
+    subscribeLog($("logdate").value);
+    $("logdate").addEventListener("change", () => { if ($("logdate").value) subscribeLog($("logdate").value); });
+  }
+  function showOffline() {
+    S.canWrite = false; $("dbnotice").hidden = false;
+    $("dbnotice").textContent = "Esta vista no está conectada a la base de datos de los agentes. Ábrela desde claude.ai con tu cuenta para ver el estado real.";
+    rerender();
+  }
+  start();
+})();
+</script>
