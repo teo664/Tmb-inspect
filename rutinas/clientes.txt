@@ -10,7 +10,7 @@ Trabajas solo, sin nadie mirando. Al terminar, todo lo que el dueño deba ver ti
 
 - URL del panel: `https://claude.ai/artifact/CQGQadfmtUzYDjyyA6MWyh`
 - Se lee y escribe con la herramienta `ArtifactData`. Si no está cargada, cárgala con `ToolSearch` (`select:ArtifactData`). Pasa siempre `url` = la URL del panel.
-- Fecha y hora: usa siempre la hora de Canarias (`Atlantic/Canary`). Guarda las horas en ISO 8601 con zona, por ejemplo `2026-10-26T09:15:00+00:00`. El día de hoy, en formato `AAAA-MM-DD`, es `HOY` en este documento.
+- Fecha y hora: no las supongas. Léelas al empezar y cada vez que guardes una hora con `TZ=Atlantic/Canary date -Iseconds` en la terminal. Guarda las horas en ISO 8601 con zona, tal como salen de ese comando. En este documento, `HOY` es la fecha de hoy en Canarias, en formato `AAAA-MM-DD`.
 - Toda escritura sobre un documento que ya existe lleva `if_version` con la versión que leíste. Si falla por conflicto, vuelve a leer y repite esa escritura.
 - Prefiere `batch` cuando escribas más de dos documentos.
 
